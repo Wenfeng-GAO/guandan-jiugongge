@@ -4,24 +4,35 @@
   'use strict';
   var L = GuandanLogic;
 
+  var SCOPE_NAMES = {};
+  SCOPE_NAMES[L.SCOPES.LEVEL_AND_JOKERS] = '只练级牌&王';
+  SCOPE_NAMES[L.SCOPES.NINE] = '九宫格 2–10';
+  SCOPE_NAMES[L.SCOPES.ALL] = '全牌';
+
   var state = {
     mode: 'practice',
-    counts: L.createInitialCounts(),
+    levelRank: L.DEFAULT_LEVEL_RANK,
+    scope: L.DEFAULT_SCOPE,
+    scopeKeys: [],
+    counts: {},
     history: [],
     deck: [],
     flipIndex: 0,
     checked: false
   };
+  state.scopeKeys = L.getScopeKeys(state.scope, state.levelRank);
+  state.counts = L.createInitialCountsForScope(state.scope, state.levelRank);
 
   var $ = function (id) { return document.getElementById(id); };
   var els = {};
 
   function grabElements() {
-    ['tab-practice', 'tab-sim',
+    ['level-select', 'scope-info',
+      'tab-practice', 'tab-sim',
       'practice-controls', 'sim-controls', 'sim-status',
       'btn-undo', 'btn-reset-practice', 'total-practice',
       'btn-new-deal', 'btn-flip', 'btn-check', 'btn-reset-sim', 'total-sim',
-      'current-card', 'flip-count', 'last-cards',
+      'current-card', 'flip-count', 'flip-total', 'last-cards',
       'main-grid', 'face-grid', 'joker-grid', 'message'
     ].forEach(function (id) { els[id] = $(id); });
   }
@@ -32,6 +43,10 @@
     btn.className = 'cell' + (key === L.SMALL_JOKER ? ' joker small' : key === L.BIG_JOKER ? ' joker big' : '');
     btn.dataset.key = key;
     btn.setAttribute('aria-label', key + '，剩余张数');
+    var lv = document.createElement('span');
+    lv.className = 'lv';
+    lv.textContent = '级';
+    btn.appendChild(lv);
     var rank = document.createElement('span');
     rank.className = 'rank';
     rank.textContent = key;
@@ -56,6 +71,22 @@
     L.JOKERS.forEach(function (j) {
       els['joker-grid'].appendChild(makeCell(j));
     });
+  }
+
+  function isInScope(key) { return state.scopeKeys.indexOf(key) !== -1; }
+
+  function renderScopeInfo() {
+    var total = L.scopeInitialTotal(state.scope, state.levelRank);
+    var text;
+    if (state.scope === L.SCOPES.NINE) {
+      text = '当前范围：九宫格 2–10 · 每格 8 张 · 共 ' + total + ' 张';
+    } else if (state.scope === L.SCOPES.ALL) {
+      text = '当前范围：全牌 2–A + 大小王 · 共 ' + total + ' 张';
+    } else {
+      text = '当前范围：级牌「' + state.levelRank + '」8 张 + 小王 2 + 大王 2 · 共 ' + total + ' 张';
+    }
+    if (state.scope !== L.SCOPES.ALL) text += ' · 灰色格子本轮不用记';
+    els['scope-info'].textContent = text;
   }
 
   function renderSimCard() {
@@ -90,16 +121,29 @@
   function render() {
     document.querySelectorAll('.cell').forEach(function (cell) {
       var key = cell.dataset.key;
-      cell.querySelector('.count').textContent = state.counts[key];
-      cell.classList.toggle('empty', state.counts[key] === 0);
+      var inScope = isInScope(key);
+      cell.classList.toggle('off', !inScope);
+      cell.classList.toggle('level', key === state.levelRank); // 级牌始终高亮，即使当前范围不含它
+      var countEl = cell.querySelector('.count');
+      if (inScope) {
+        countEl.textContent = state.counts[key];
+        cell.classList.toggle('empty', state.counts[key] === 0);
+      } else {
+        countEl.textContent = '—';
+        cell.classList.remove('empty');
+      }
     });
-    els['total-practice'].textContent = L.totalRemaining(state.counts);
-    els['total-sim'].textContent = L.totalRemaining(state.counts);
+    var total = L.totalRemaining(state.counts, state.scopeKeys);
+    els['total-practice'].textContent = total;
+    els['total-sim'].textContent = total;
     els['btn-undo'].disabled = state.history.length === 0;
     els['flip-count'].textContent = state.flipIndex;
-    els['btn-flip'].disabled = state.flipIndex >= L.TOTAL_CARDS || state.deck.length === 0;
+    els['flip-total'].textContent =
+      state.deck.length || L.scopeInitialTotal(state.scope, state.levelRank);
+    els['btn-flip'].disabled = state.deck.length === 0 || state.flipIndex >= state.deck.length;
     els['btn-check'].disabled = state.flipIndex === 0 || state.deck.length === 0;
     els['btn-reset-sim'].disabled = state.deck.length === 0;
+    renderScopeInfo();
     renderSimCard();
   }
 
@@ -117,6 +161,7 @@
   }
 
   function onCellTap(key) {
+    if (!isInScope(key)) return;
     clearCheck();
     if (state.mode === 'practice') {
       if (L.decrement(state.counts, key)) {
@@ -153,7 +198,7 @@
     state.mode = mode;
     clearCheck();
     showMessage('');
-    state.counts = L.createInitialCounts();
+    state.counts = L.createInitialCountsForScope(state.scope, state.levelRank);
     state.history = [];
     if (mode === 'sim') {
       state.flipIndex = 0;
@@ -164,6 +209,35 @@
     els['sim-controls'].classList.toggle('hidden', mode !== 'sim');
     els['sim-status'].classList.toggle('hidden', mode !== 'sim');
     render();
+  }
+
+  // 切换级牌或范围：记数与翻牌进度清零；单人模拟需重新洗牌
+  function applySettingsChange(msg) {
+    state.scopeKeys = L.getScopeKeys(state.scope, state.levelRank);
+    state.counts = L.createInitialCountsForScope(state.scope, state.levelRank);
+    state.history = [];
+    // 无论当前在哪个模式，都丢掉旧子牌堆，避免切回单人模拟时用到过期范围的牌
+    state.deck = [];
+    state.flipIndex = 0;
+    clearCheck();
+    if (state.mode === 'sim') {
+      showMessage(msg + '，记数与翻牌已清零，请点「新洗牌」重新开始。', 'info');
+    } else {
+      showMessage(msg + '，记数已重置（单人模拟需重新洗牌）。', 'info');
+    }
+    render();
+  }
+
+  function changeScope(scope) {
+    if (scope === state.scope) return;
+    state.scope = scope;
+    applySettingsChange('练习范围已切换为「' + SCOPE_NAMES[scope] + '」');
+  }
+
+  function changeLevel(rank) {
+    if (rank === state.levelRank) return;
+    state.levelRank = rank;
+    applySettingsChange('级牌已设为「' + rank + '」');
   }
 
   function undo() {
@@ -177,19 +251,19 @@
   }
 
   function resetCounts() {
-    state.counts = L.createInitialCounts();
+    state.counts = L.createInitialCountsForScope(state.scope, state.levelRank);
     state.history = [];
     clearCheck();
     render();
   }
 
   function newDeal() {
-    state.deck = L.shuffle(L.createDeck());
+    state.deck = L.shuffle(L.filterDeckByScope(L.createDeck(), state.scope, state.levelRank));
     state.flipIndex = 0;
-    state.counts = L.createInitialCounts();
+    state.counts = L.createInitialCountsForScope(state.scope, state.levelRank);
     state.history = [];
     clearCheck();
-    showMessage('新牌已洗好，共 108 张。点「翻开下一张」开始。', 'info');
+    showMessage('新牌已洗好：只发范围内的牌，共 ' + state.deck.length + ' 张。点「翻开下一张」开始。', 'info');
     render();
   }
 
@@ -199,7 +273,7 @@
       return;
     }
     state.flipIndex = 0;
-    state.counts = L.createInitialCounts();
+    state.counts = L.createInitialCountsForScope(state.scope, state.levelRank);
     state.history = [];
     clearCheck();
     showMessage('已重置（牌序不变，重新从头翻）。', 'info');
@@ -212,13 +286,13 @@
       showMessage('请先点「新洗牌」', 'warn');
       return;
     }
-    if (state.flipIndex >= L.TOTAL_CARDS) {
-      showMessage('108 张已全部翻完，可以点「核对答案」。', 'info');
+    if (state.flipIndex >= state.deck.length) {
+      showMessage('范围内的 ' + state.deck.length + ' 张已全部翻完，可以点「核对答案」。', 'info');
       return;
     }
     state.flipIndex += 1;
-    if (state.flipIndex === L.TOTAL_CARDS) {
-      showMessage('108 张全部翻完，可以点「核对答案」了。', 'info');
+    if (state.flipIndex === state.deck.length) {
+      showMessage('范围内 ' + state.deck.length + ' 张全部翻完，可以点「核对答案」了。', 'info');
     } else {
       showMessage('');
     }
@@ -231,13 +305,14 @@
       return;
     }
     var played = state.deck.slice(0, state.flipIndex);
-    var wrong = L.checkAnswer(state.counts, played);
+    var wrong = L.checkAnswer(state.counts, played, state.scopeKeys);
     clearCheck();
     state.checked = true;
 
     var truth = L.trueRemaining(played);
     document.querySelectorAll('.cell').forEach(function (cell) {
       var key = cell.dataset.key;
+      if (!isInScope(key)) return;
       var t = cell.querySelector('.truth');
       if (state.counts[key] === truth[key]) {
         cell.classList.add('ok');
@@ -260,12 +335,25 @@
   function init() {
     grabElements();
     buildGrids();
+    L.RANKS.forEach(function (r) {
+      var opt = document.createElement('option');
+      opt.value = r;
+      opt.textContent = r;
+      els['level-select'].appendChild(opt);
+    });
+    els['level-select'].value = state.levelRank;
+    els['level-select'].addEventListener('change', function () { changeLevel(this.value); });
+    document.querySelectorAll('input[name="scope"]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        if (radio.checked) changeScope(radio.value);
+      });
+    });
     els['tab-practice'].addEventListener('click', function () { switchMode('practice'); });
     els['tab-sim'].addEventListener('click', function () { switchMode('sim'); });
     els['btn-undo'].addEventListener('click', undo);
     els['btn-reset-practice'].addEventListener('click', function () {
       resetCounts();
-      showMessage('已重置，从初始张数重新开始。', 'info');
+      showMessage('已重置为本范围初始张数。', 'info');
     });
     els['btn-new-deal'].addEventListener('click', newDeal);
     els['btn-flip'].addEventListener('click', flipNext);

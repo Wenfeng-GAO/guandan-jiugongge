@@ -202,6 +202,8 @@ body {
   border-radius: 6px;
   padding: 2px 5px;
 }
+/* 未标出正确张数时不要留下空的红角标（绝对定位 + padding 仍会画出色块） */
+.cell .truth:empty { display: none; }
 .cell.wrong .count { color: #c0392b; }
 
 @keyframes shake {
@@ -229,6 +231,119 @@ body {
   font-size: .75rem;
   opacity: .5;
 }
+
+/* 设置区：级牌 + 练习范围 */
+.settings {
+  background: rgba(0, 0, 0, .28);
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  font-size: .88rem;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.setting-row:last-of-type { margin-bottom: 4px; }
+.setting-label {
+  flex-shrink: 0;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.level-select {
+  flex: 1;
+  max-width: 150px;
+  min-height: 44px;
+  padding: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f5f5f0;
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.level-select option { color: #111; background: #fff; }
+
+/* 范围分段控件 */
+.seg { display: flex; flex: 1; gap: 6px; }
+.seg-item { flex: 1; position: relative; }
+.seg-item input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.seg-item span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 2px;
+  font-size: .78rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.25;
+  color: #dfe9e0;
+  background: rgba(0, 0, 0, .3);
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.seg-item input:checked + span {
+  background: #f0c040;
+  border-color: #f0c040;
+  color: #2a1e05;
+}
+.seg-item input:focus-visible + span {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.scope-info {
+  font-size: .8rem;
+  line-height: 1.5;
+  opacity: .85;
+}
+
+/* 级牌高亮：金色描边光环 + 「级」角标（左上角） */
+.cell.level {
+  box-shadow: 0 0 0 3px #f0c040, 0 2px 8px rgba(0, 0, 0, .35);
+}
+.cell .lv {
+  display: none;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: .68rem;
+  font-weight: 700;
+  color: #2a1e05;
+  background: #f0c040;
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+.cell.level .lv { display: block; }
+
+/* 范围外格子：变灰、不可点、不计入统计与核对 */
+.cell.off {
+  opacity: .38;
+  filter: grayscale(.6);
+  cursor: not-allowed;
+}
+.cell.off:active { transform: none; }
+.cell.off .count { color: #888; }
+
+
+/* 级牌即使不在本轮范围内，仍保持金色提示（便于认级） */
+.cell.off.level {
+  box-shadow: 0 0 0 2px #f0c040, 0 0 10px rgba(240, 192, 64, .35);
+  opacity: .72;
+  filter: none;
+}
+.cell.off.level .lv { display: block; }
 
 /* 小屏适配 */
 @media (max-width: 360px) {

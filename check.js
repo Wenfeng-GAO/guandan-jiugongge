@@ -1,4 +1,4 @@
-/* node check.js — 自检：牌堆(108张) / 减数 / 洗牌 / 核对 */
+/* node check.js — 自检：牌堆(108张) / 减数 / 洗牌 / 核对 / 级牌与三档范围 */
 'use strict';
 var assert = require('assert');
 var L = require('./logic.js');
@@ -84,4 +84,110 @@ assert.deepStrictEqual(L.RANKS.slice(0, 9), ['2', '3', '4', '5', '6', '7', '8', 
 assert.deepStrictEqual(L.RANKS.slice(9), ['J', 'Q', 'K', 'A']);
 assert.deepStrictEqual(L.JOKERS, ['小王', '大王']);
 
-console.log('OK：全部自检通过（108 张牌堆 / 减数 / 洗牌 / 真实剩余 / 核对 / 布局常量）');
+// —— 级牌与三档范围 ——
+assert.strictEqual(L.DEFAULT_SCOPE, L.SCOPES.LEVEL_AND_JOKERS, '默认范围必须是「只练级牌&王」');
+assert.strictEqual(L.DEFAULT_LEVEL_RANK, '2', '默认级牌为 2');
+
+assert.deepStrictEqual(L.getScopeKeys('level', '2'), ['2', '小王', '大王']);
+assert.deepStrictEqual(L.getScopeKeys('level', 'A'), ['A', '小王', '大王']);
+assert.deepStrictEqual(L.getScopeKeys('nine', '2'), L.RANKS.slice(0, 9));
+assert.deepStrictEqual(L.getScopeKeys('all', 'K'), L.ALL_KEYS);
+assert.throws(function () { L.getScopeKeys('xxx'); }, /未知范围/);
+assert.throws(function () { L.getScopeKeys('level', 'X'); }, /未知级牌/);
+assert.throws(function () { L.getScopeKeys('level', '小王'); }, /未知级牌/);
+
+var lc = L.createInitialCountsForScope('level', '2');
+assert.strictEqual(lc['2'], 8, '级牌在范围内，应为 8');
+assert.strictEqual(lc['小王'], 2);
+assert.strictEqual(lc['大王'], 2);
+assert.strictEqual(lc['3'], 0, '范围外点数应为 0');
+assert.strictEqual(lc['J'], 0, '范围外点数应为 0');
+assert.strictEqual(L.totalRemaining(lc, L.getScopeKeys('level', '2')), 12);
+assert.strictEqual(L.totalRemaining(lc), 12, '范围外为 0，全量求和也只算范围内');
+
+assert.strictEqual(L.scopeInitialTotal('level', '2'), 12, '级牌 8 + 王 2+2 = 12');
+assert.strictEqual(L.scopeInitialTotal('level', 'A'), 12);
+assert.strictEqual(L.scopeInitialTotal('nine', '5'), 72);
+assert.strictEqual(L.scopeInitialTotal('all', '2'), 108);
+
+var scopeDeck = L.createDeckForScope('level', '2');
+assert.strictEqual(scopeDeck.length, 12, '级牌档子牌堆应为 12 张');
+var sd = {};
+scopeDeck.forEach(function (c) { sd[c] = (sd[c] || 0) + 1; });
+assert.deepStrictEqual(sd, { '2': 8, '小王': 2, '大王': 2 }, '级牌档牌堆构成');
+assert.strictEqual(L.createDeckForScope('level', 'Q').length, 12);
+assert.strictEqual(L.createDeckForScope('nine', '2').length, 72);
+assert.strictEqual(L.createDeckForScope('all', '2').length, 108);
+
+var levelA = L.createDeckForScope('level', 'A');
+assert.strictEqual(levelA.length, 12, '级牌 A 的子牌堆应为 12 张');
+var la = {};
+levelA.forEach(function (c) { la[c] = (la[c] || 0) + 1; });
+assert.deepStrictEqual(la, { 'A': 8, '小王': 2, '大王': 2 }, '级牌 A 应有 8 张 A');
+
+// 九宫格档不因级牌是 A 就把 A 或王算进去
+var nineA = L.createDeckForScope('nine', 'A');
+assert.strictEqual(nineA.length, 72);
+assert.strictEqual(nineA.indexOf('A'), -1, '九宫格范围不含 A');
+assert.strictEqual(nineA.indexOf(L.SMALL_JOKER), -1);
+assert.strictEqual(nineA.indexOf(L.BIG_JOKER), -1);
+assert.strictEqual(nineA.filter(function (c) { return c === '10'; }).length, 8);
+
+var filtered = L.filterDeckByScope(deck, 'level', 'A');
+assert.strictEqual(filtered.length, 12, '过滤后应为 12 张');
+assert.strictEqual(deck.length, 108, 'filter 不应改动原牌堆');
+var fd = {};
+filtered.forEach(function (c) { fd[c] = (fd[c] || 0) + 1; });
+assert.deepStrictEqual(fd, { 'A': 8, '小王': 2, '大王': 2 });
+
+// 核对只比范围内：范围外记错不应报
+var playedScope = ['2', '2', '小王'];
+var userScope = L.createInitialCountsForScope('level', '2');
+userScope['2'] = 6;
+userScope['小王'] = 1;
+userScope['3'] = 7; // 范围外，必须被忽略
+userScope['A'] = 0; // 范围外，必须被忽略
+assert.deepStrictEqual(
+  L.checkAnswer(userScope, playedScope, L.getScopeKeys('level', '2')),
+  [],
+  '范围外记错不应影响核对结果'
+);
+
+userScope['2'] = 5;
+var wrongScope = L.checkAnswer(userScope, playedScope, L.getScopeKeys('level', '2'));
+assert.deepStrictEqual(wrongScope.map(function (w) { return w.key; }), ['2']);
+assert.strictEqual(wrongScope[0].user, 5);
+assert.strictEqual(wrongScope[0].truth, 6);
+
+// 默认参数行为不变：不传 scopeKeys 仍核对全牌
+var userAll = L.createInitialCounts();
+userAll['2'] = 6;
+userAll['小王'] = 1;
+userAll['3'] = 7;
+var wrongAll = L.checkAnswer(userAll, playedScope);
+assert.deepStrictEqual(wrongAll.map(function (w) { return w.key; }), ['3']);
+
+// 子牌堆抽完：范围内真实剩余全 0
+var smallDeck = L.shuffle(L.createDeckForScope('level', '2'));
+var truthScope = L.trueRemaining(smallDeck);
+assert.strictEqual(truthScope['2'], 0);
+assert.strictEqual(truthScope['小王'], 0);
+assert.strictEqual(truthScope['大王'], 0);
+var zeroScope = L.createInitialCountsForScope('level', '2');
+L.getScopeKeys('level', '2').forEach(function (k) { zeroScope[k] = 0; });
+assert.deepStrictEqual(L.checkAnswer(zeroScope, smallDeck, L.getScopeKeys('level', '2')), []);
+
+
+// 10. 级牌为 A 时「只练级牌&王」：子牌堆 12 张，其中 A 8 张、大小王各 2
+var deckA = L.createDeckForScope(L.SCOPES.LEVEL_AND_JOKERS, 'A');
+assert.strictEqual(deckA.length, 12, '级牌 A 时子牌堆应为 12');
+var aCount = deckA.filter(function (c) { return c === 'A'; }).length;
+assert.strictEqual(aCount, 8, '级牌 A 时应有 8 张 A');
+assert.strictEqual(deckA.filter(function (c) { return c === L.SMALL_JOKER; }).length, 2);
+assert.strictEqual(deckA.filter(function (c) { return c === L.BIG_JOKER; }).length, 2);
+assert.deepStrictEqual(L.getScopeKeys('level', 'A'), ['A', L.SMALL_JOKER, L.BIG_JOKER]);
+// 九宫格范围不含级牌 A，但级牌设置仍合法（UI 仍可高亮 A）
+assert.strictEqual(L.getScopeKeys('nine', 'A').indexOf('A'), -1);
+assert.strictEqual(L.createInitialCountsForScope('nine', 'A')['A'], 0);
+
+console.log('OK：全部自检通过（108 张牌堆 / 减数 / 洗牌 / 真实剩余 / 核对 / 级牌 / 三档范围 / 范围过滤 / 范围核对）');
