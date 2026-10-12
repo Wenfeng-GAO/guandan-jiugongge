@@ -82,14 +82,14 @@ assert.deepStrictEqual(L.checkAnswer(allZero, full), []);
 
 assert.deepStrictEqual(L.RANKS.slice(0, 9), ['2', '3', '4', '5', '6', '7', '8', '9', '10']);
 assert.deepStrictEqual(L.RANKS.slice(9), ['J', 'Q', 'K', 'A']);
-assert.deepStrictEqual(L.JOKERS, ['小王', '大王']);
+assert.deepStrictEqual(L.JOKERS, ['小王', '大王']);  // ALL_KEYS 后缀顺序不变
 
 // —— 级牌与三档范围 ——
 assert.strictEqual(L.DEFAULT_SCOPE, L.SCOPES.LEVEL_AND_JOKERS, '默认范围必须是「只练级牌&王」');
 assert.strictEqual(L.DEFAULT_LEVEL_RANK, '2', '默认级牌为 2');
 
-assert.deepStrictEqual(L.getScopeKeys('level', '2'), ['2', '小王', '大王']);
-assert.deepStrictEqual(L.getScopeKeys('level', 'A'), ['A', '小王', '大王']);
+assert.deepStrictEqual(L.getScopeKeys('level', '2'), ['2', '大王', '小王']);
+assert.deepStrictEqual(L.getScopeKeys('level', 'A'), ['A', '大王', '小王']);
 assert.deepStrictEqual(L.getScopeKeys('nine', '2'), L.RANKS.slice(0, 9));
 assert.deepStrictEqual(L.getScopeKeys('all', 'K'), L.ALL_KEYS);
 assert.throws(function () { L.getScopeKeys('xxx'); }, /未知范围/);
@@ -114,7 +114,7 @@ var scopeDeck = L.createDeckForScope('level', '2');
 assert.strictEqual(scopeDeck.length, 12, '级牌档子牌堆应为 12 张');
 var sd = {};
 scopeDeck.forEach(function (c) { sd[c] = (sd[c] || 0) + 1; });
-assert.deepStrictEqual(sd, { '2': 8, '小王': 2, '大王': 2 }, '级牌档牌堆构成');
+assert.deepStrictEqual(sd, { '2': 8, '大王': 2, '小王': 2 }, '级牌档牌堆构成');
 assert.strictEqual(L.createDeckForScope('level', 'Q').length, 12);
 assert.strictEqual(L.createDeckForScope('nine', '2').length, 72);
 assert.strictEqual(L.createDeckForScope('all', '2').length, 108);
@@ -123,7 +123,7 @@ var levelA = L.createDeckForScope('level', 'A');
 assert.strictEqual(levelA.length, 12, '级牌 A 的子牌堆应为 12 张');
 var la = {};
 levelA.forEach(function (c) { la[c] = (la[c] || 0) + 1; });
-assert.deepStrictEqual(la, { 'A': 8, '小王': 2, '大王': 2 }, '级牌 A 应有 8 张 A');
+assert.deepStrictEqual(la, { 'A': 8, '大王': 2, '小王': 2 }, '级牌 A 应有 8 张 A');
 
 // 九宫格档不因级牌是 A 就把 A 或王算进去
 var nineA = L.createDeckForScope('nine', 'A');
@@ -138,7 +138,7 @@ assert.strictEqual(filtered.length, 12, '过滤后应为 12 张');
 assert.strictEqual(deck.length, 108, 'filter 不应改动原牌堆');
 var fd = {};
 filtered.forEach(function (c) { fd[c] = (fd[c] || 0) + 1; });
-assert.deepStrictEqual(fd, { 'A': 8, '小王': 2, '大王': 2 });
+assert.deepStrictEqual(fd, { 'A': 8, '大王': 2, '小王': 2 });
 
 // 核对只比范围内：范围外记错不应报
 var playedScope = ['2', '2', '小王'];
@@ -185,9 +185,74 @@ var aCount = deckA.filter(function (c) { return c === 'A'; }).length;
 assert.strictEqual(aCount, 8, '级牌 A 时应有 8 张 A');
 assert.strictEqual(deckA.filter(function (c) { return c === L.SMALL_JOKER; }).length, 2);
 assert.strictEqual(deckA.filter(function (c) { return c === L.BIG_JOKER; }).length, 2);
-assert.deepStrictEqual(L.getScopeKeys('level', 'A'), ['A', L.SMALL_JOKER, L.BIG_JOKER]);
+assert.deepStrictEqual(L.getScopeKeys('level', 'A'), ['A', L.BIG_JOKER, L.SMALL_JOKER]);
 // 九宫格范围不含级牌 A，但级牌设置仍合法（UI 仍可高亮 A）
 assert.strictEqual(L.getScopeKeys('nine', 'A').indexOf('A'), -1);
 assert.strictEqual(L.createInitialCountsForScope('nine', 'A')['A'], 0);
 
-console.log('OK：全部自检通过（108 张牌堆 / 减数 / 洗牌 / 真实剩余 / 核对 / 级牌 / 三档范围 / 范围过滤 / 范围核对）');
+// legacy checks passed
+
+
+// —— v4：三行地图 / 点改 / 连对升档 / 闭卷核对 ——
+assert.deepStrictEqual(L.getRowKeys(1, '2'), ['2', '大王', '小王']);
+assert.deepStrictEqual(L.getRowKeys(1, 'A'), ['A', '大王', '小王']);
+assert.deepStrictEqual(L.getRowKeys(2, '2'), ['A', 'K', 'Q']);
+assert.deepStrictEqual(L.getRowKeys(3, '2'), ['J', '10', '9']);
+assert.throws(function () { L.getRowKeys(4, '2'); }, /未知行/);
+
+assert.deepStrictEqual(L.getUnlockedKeys(1, '2'), ['2', '大王', '小王']);
+assert.deepStrictEqual(L.getUnlockedKeys(2, '2'), ['2', '大王', '小王', 'A', 'K', 'Q']);
+assert.deepStrictEqual(L.getUnlockedKeys(3, '2'), ['2', '大王', '小王', 'A', 'K', 'Q', 'J', '10', '9']);
+// 级牌与行2重叠时去重
+assert.deepStrictEqual(L.getUnlockedKeys(2, 'A'), ['A', '大王', '小王', 'K', 'Q']);
+assert.strictEqual(L.getUnlockedKeys(2, 'A').filter(function (k) { return k === 'A'; }).length, 1);
+
+assert.strictEqual(L.maxCopies('2'), 8);
+assert.strictEqual(L.maxCopies('小王'), 2);
+assert.strictEqual(L.cycleGuess(0, '小王'), 1);
+assert.strictEqual(L.cycleGuess(1, '小王'), 2);
+assert.strictEqual(L.cycleGuess(2, '小王'), 0);
+assert.strictEqual(L.cycleGuess(8, '2'), 0);
+assert.strictEqual(L.cycleGuess(7, '2'), 8);
+
+var keys1 = L.getUnlockedKeys(1, '2');
+assert.strictEqual(L.scopeInitialTotalForKeys(keys1), 12);
+var deck1 = L.createDeckForKeys(keys1);
+assert.strictEqual(deck1.length, 12);
+
+var keys2 = L.getUnlockedKeys(2, '2');
+assert.strictEqual(L.scopeInitialTotalForKeys(keys2), 12 + 24);
+assert.strictEqual(L.createDeckForKeys(keys2).length, 36);
+
+var keys3 = L.getUnlockedKeys(3, '2');
+assert.strictEqual(L.createDeckForKeys(keys3).length, 60);
+
+// 闭卷填剩余核对：只比解锁格
+var playedV4 = ['2', '2', '大王'];
+var guesses = L.createZeroGuesses(keys1);
+guesses['2'] = 6;
+guesses['大王'] = 1;
+guesses['小王'] = 2;
+assert.deepStrictEqual(L.checkAnswer(guesses, playedV4, keys1), []);
+guesses['小王'] = 0;
+var wrongV4 = L.checkAnswer(guesses, playedV4, keys1);
+assert.strictEqual(wrongV4.length, 1);
+assert.strictEqual(wrongV4[0].key, '小王');
+assert.strictEqual(wrongV4[0].user, 0);
+assert.strictEqual(wrongV4[0].truth, 2);
+
+// 连对升档
+var s0 = L.applyStreakAfterCheck(1, 0, true);
+assert.deepStrictEqual(s0, { unlockedRows: 1, streak: 1, justUnlocked: false });
+var s1 = L.applyStreakAfterCheck(1, 2, true);
+assert.deepStrictEqual(s1, { unlockedRows: 2, streak: 0, justUnlocked: true });
+var sFail = L.applyStreakAfterCheck(1, 2, false);
+assert.deepStrictEqual(sFail, { unlockedRows: 1, streak: 0, justUnlocked: false });
+var sMax = L.applyStreakAfterCheck(3, 2, true);
+assert.deepStrictEqual(sMax, { unlockedRows: 3, streak: 3, justUnlocked: false });
+
+assert.strictEqual(L.UNLOCK_STREAK_NEED, 3);
+assert.ok(L.rowLabel(1).indexOf('级牌') !== -1);
+
+console.log('OK：全部自检通过（含 v4 三行解锁 / 点改 / 连对升档 / 闭卷核对）');
+
