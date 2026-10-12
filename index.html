@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b4d26">
+  <meta name="description" content="掼蛋九宫格记牌练习：出牌练习与单人模拟核对">
+  <title>掼蛋九宫格记牌练习</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>掼蛋九宫格记牌练习</h1>
+    <p class="subtitle">两副牌 108 张 · 2–A 各 8 张 · 小王、大王各 2 张</p>
+  </header>
+
+  <details class="howto">
+    <summary>怎么玩？</summary>
+    <div class="howto-body">
+      <p><strong>记牌规则：</strong>把 2–10 放进脑子里的九宫格，J Q K A 单独一排，小王、大王单独记。每格先记住初始张数：2–A 各 8 张，大小王各 2 张。看到牌出出去，就在心里给对应格减 1。</p>
+      <p><strong>模式一 · 出牌练习：</strong>心里模拟出牌过程，点到某点数，该格就减 1（最低 0）。点错可「撤销」，随时「重置」。练的是「见牌就减」的条件反射。</p>
+      <p><strong>模式二 · 单人模拟：</strong>点「新洗牌」发好 108 张牌，再点「翻开下一张」逐张看牌；每翻一张，凭记忆点掉九宫格里对应的格子。随时点「核对答案」：全对变绿，记错的格子变红并标出正确张数。</p>
+    </div>
+  </details>
+
+  <nav class="mode-tabs" role="tablist">
+    <button id="tab-practice" class="tab active" role="tab">出牌练习</button>
+    <button id="tab-sim" class="tab" role="tab">单人模拟</button>
+  </nav>
+
+  <section id="practice-controls" class="controls">
+    <button id="btn-undo" class="btn">撤销</button>
+    <button id="btn-reset-practice" class="btn">重置</button>
+    <span class="total">剩余 <b id="total-practice">108</b> 张</span>
+  </section>
+
+  <section id="sim-controls" class="controls hidden">
+    <button id="btn-new-deal" class="btn">新洗牌</button>
+    <button id="btn-flip" class="btn primary" disabled>翻开下一张</button>
+    <button id="btn-check" class="btn accent" disabled>核对答案</button>
+    <button id="btn-reset-sim" class="btn">重置</button>
+    <span class="total">剩余 <b id="total-sim">108</b> 张</span>
+  </section>
+
+  <section id="sim-status" class="sim-status hidden">
+    <div id="current-card" class="card-back">洗</div>
+    <div class="flip-info">
+      <div class="flip-count">已翻 <b id="flip-count">0</b> / 108 张</div>
+      <div id="last-cards" class="last-cards"></div>
+    </div>
+  </section>
+
+  <main class="grid-wrap">
+    <div id="main-grid" class="main-grid" aria-label="点数 2 到 10"></div>
+    <div id="face-grid" class="face-grid" aria-label="J Q K A"></div>
+    <div id="joker-grid" class="joker-grid" aria-label="小王 大王"></div>
+  </main>
+
+  <div id="message" class="message" aria-live="polite"></div>
+
+  <footer class="site-footer">纯静态页面 · 打开即用 · 不保存任何数据</footer>
+
+  <script src="logic.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
