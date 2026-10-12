@@ -1,4 +1,6 @@
-/* 掼蛋九宫格记牌练习 - 纯逻辑层（浏览器与 Node 共用） */
+/* 掼蛋九宫格记牌练习 - 纯逻辑层（浏览器与 Node 共用）
+ * v4：闭卷填剩余 + 三行渐进解锁（级/王 → A/K/Q → J/10/9）
+ */
 (function (global, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory();
@@ -8,43 +10,64 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // 固定布局：3×3 九宫格 2–10，另起一行 J Q K A，单独格子小王、大王
   var RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   var SMALL_JOKER = '小王';
   var BIG_JOKER = '大王';
   var JOKERS = [SMALL_JOKER, BIG_JOKER];
   var ALL_KEYS = RANKS.concat(JOKERS);
 
-  var COPIES_PER_RANK = 8;   // 两副牌：每种点数 2 副 × 4 花色 = 8 张
-  var COPIES_PER_JOKER = 2;  // 小王 2、大王 2
-  var TOTAL_CARDS = 108;     // 两副牌共 108 张
+  var COPIES_PER_RANK = 8;
+  var COPIES_PER_JOKER = 2;
+  var TOTAL_CARDS = 108;
 
-  // 练习范围（三档，默认不是全牌）
-  var SCOPES = {
-    LEVEL_AND_JOKERS: 'level', // 只练级牌&王
-    NINE: 'nine',              // 九宫格 2–10
-    ALL: 'all'                 // 全牌
-  };
-  var DEFAULT_SCOPE = SCOPES.LEVEL_AND_JOKERS;
   var DEFAULT_LEVEL_RANK = '2';
+  var UNLOCK_STREAK_NEED = 3;
+  var MAX_UNLOCKED_ROWS = 3;
+
+  function getRowKeys(rowIndex, levelRank) {
+    levelRank = levelRank || DEFAULT_LEVEL_RANK;
+    if (!isValidRank(levelRank)) throw new Error('未知级牌: ' + levelRank);
+    if (rowIndex === 1) return [levelRank, BIG_JOKER, SMALL_JOKER];
+    if (rowIndex === 2) return ['A', 'K', 'Q'];
+    if (rowIndex === 3) return ['J', '10', '9'];
+    throw new Error('未知行: ' + rowIndex);
+  }
+
+  function getUnlockedKeys(unlockedRows, levelRank) {
+    unlockedRows = clampRows(unlockedRows);
+    var seen = {};
+    var keys = [];
+    for (var r = 1; r <= unlockedRows; r++) {
+      getRowKeys(r, levelRank).forEach(function (k) {
+        if (!seen[k]) {
+          seen[k] = true;
+          keys.push(k);
+        }
+      });
+    }
+    return keys;
+  }
+
+  function clampRows(n) {
+    n = n | 0;
+    if (n < 1) return 1;
+    if (n > MAX_UNLOCKED_ROWS) return MAX_UNLOCKED_ROWS;
+    return n;
+  }
 
   function isValidRank(r) { return RANKS.indexOf(r) !== -1; }
 
-  function isValidScope(scope) {
-    return scope === SCOPES.LEVEL_AND_JOKERS ||
-      scope === SCOPES.NINE ||
-      scope === SCOPES.ALL;
+  function maxCopies(key) {
+    if (key === SMALL_JOKER || key === BIG_JOKER) return COPIES_PER_JOKER;
+    if (RANKS.indexOf(key) !== -1) return COPIES_PER_RANK;
+    throw new Error('未知点数: ' + key);
   }
 
-  // 当前练习范围内的点数列表
-  function getScopeKeys(scope, levelRank) {
-    scope = scope || DEFAULT_SCOPE;
-    levelRank = levelRank || DEFAULT_LEVEL_RANK;
-    if (!isValidScope(scope)) throw new Error('未知范围: ' + scope);
-    if (scope === SCOPES.NINE) return RANKS.slice(0, 9);
-    if (scope === SCOPES.ALL) return ALL_KEYS.slice();
-    if (!isValidRank(levelRank)) throw new Error('未知级牌: ' + levelRank);
-    return [levelRank, SMALL_JOKER, BIG_JOKER];
+  function cycleGuess(current, key) {
+    var max = maxCopies(key);
+    var n = (current | 0) + 1;
+    if (n > max) n = 0;
+    return n;
   }
 
   function createInitialCounts() {
@@ -55,9 +78,7 @@
     return counts;
   }
 
-  // 范围版初始记数：范围内为初始张数，范围外固定 0（不参与统计与核对）
-  function createInitialCountsForScope(scope, levelRank) {
-    var keys = getScopeKeys(scope, levelRank);
+  function createInitialCountsForKeys(keys) {
     var init = createInitialCounts();
     var counts = {};
     ALL_KEYS.forEach(function (k) {
@@ -66,49 +87,41 @@
     return counts;
   }
 
-  // 范围内的初始总张数（如级牌 8 + 王 2+2 = 12）
-  function scopeInitialTotal(scope, levelRank) {
-    return totalRemaining(createInitialCountsForScope(scope, levelRank));
+  function createZeroGuesses(keys) {
+    var g = {};
+    ALL_KEYS.forEach(function (k) { g[k] = 0; });
+    keys.forEach(function (k) { g[k] = 0; });
+    return g;
   }
 
-  // keys 缺省为全牌；传 scopeKeys 时只统计范围内
+  function scopeInitialTotalForKeys(keys) {
+    return totalRemaining(createInitialCountsForKeys(keys), keys);
+  }
+
   function totalRemaining(counts, keys) {
     keys = keys || ALL_KEYS;
     return keys.reduce(function (sum, k) { return sum + (counts[k] || 0); }, 0);
   }
 
-  // 减 1，最低 0；成功返回 true，已为 0 返回 false
-  function decrement(counts, key) {
-    if (ALL_KEYS.indexOf(key) === -1) throw new Error('未知点数: ' + key);
-    if (counts[key] <= 0) return false;
-    counts[key] -= 1;
-    return true;
-  }
-
-  // 洗一副完整的 108 张牌（用点数字符串表示）
   function createDeck() {
     var deck = [];
     for (var d = 0; d < 2; d++) {
       RANKS.forEach(function (r) {
-        for (var i = 0; i < 4; i++) deck.push(r); // 每副牌 4 个花色
+        for (var i = 0; i < 4; i++) deck.push(r);
       });
       deck.push(SMALL_JOKER, BIG_JOKER);
     }
     return deck;
   }
 
-  // 只保留范围内的牌（108 → 12 / 72 / 108）
-  function filterDeckByScope(deck, scope, levelRank) {
-    var keys = getScopeKeys(scope, levelRank);
+  function filterDeckByKeys(deck, keys) {
     return deck.filter(function (c) { return keys.indexOf(c) !== -1; });
   }
 
-  // 范围内的子牌堆
-  function createDeckForScope(scope, levelRank) {
-    return filterDeckByScope(createDeck(), scope, levelRank);
+  function createDeckForKeys(keys) {
+    return filterDeckByKeys(createDeck(), keys);
   }
 
-  // Fisher-Yates 洗牌，返回新数组，不改动原数组
   function shuffle(deck, rng) {
     rng = rng || Math.random;
     var a = deck.slice();
@@ -119,7 +132,6 @@
     return a;
   }
 
-  // 统计已翻出的牌里每种点数的张数
   function countPlayed(playedCards) {
     var played = {};
     ALL_KEYS.forEach(function (k) { played[k] = 0; });
@@ -130,7 +142,6 @@
     return played;
   }
 
-  // 真实剩余 = 初始值 - 已翻出
   function trueRemaining(playedCards) {
     var init = createInitialCounts();
     var played = countPlayed(playedCards);
@@ -139,11 +150,9 @@
     return rem;
   }
 
-  // 核对：只比较 scopeKeys（缺省全牌），范围外不标红绿；
-  // 返回不一致格子的列表 [{key, user, truth}]，空数组 = 全对
-  function checkAnswer(userCounts, playedCards, scopeKeys) {
+  function checkAnswer(userCounts, playedCards, keys) {
     var truth = trueRemaining(playedCards);
-    var keys = scopeKeys || ALL_KEYS;
+    keys = keys || ALL_KEYS;
     var wrong = [];
     keys.forEach(function (k) {
       if (userCounts[k] !== truth[k]) {
@@ -151,6 +160,65 @@
       }
     });
     return wrong;
+  }
+
+  function applyStreakAfterCheck(unlockedRows, streak, allCorrect) {
+    unlockedRows = clampRows(unlockedRows);
+    streak = streak | 0;
+    if (!allCorrect) {
+      return { unlockedRows: unlockedRows, streak: 0, justUnlocked: false };
+    }
+    var next = streak + 1;
+    if (next >= UNLOCK_STREAK_NEED && unlockedRows < MAX_UNLOCKED_ROWS) {
+      return { unlockedRows: unlockedRows + 1, streak: 0, justUnlocked: true };
+    }
+    return { unlockedRows: unlockedRows, streak: next, justUnlocked: false };
+  }
+
+  function rowLabel(unlockedRows) {
+    unlockedRows = clampRows(unlockedRows);
+    if (unlockedRows === 1) return '档 · 级牌&王 · 灰行升档预告';
+    if (unlockedRows === 2) return '档 · 级牌&王 + A/K/Q · 灰行升档预告';
+    return '档 · 级牌&王 + A/K/Q + J/10/9';
+  }
+
+  var SCOPES = {
+    LEVEL_AND_JOKERS: 'level',
+    NINE: 'nine',
+    ALL: 'all'
+  };
+  var DEFAULT_SCOPE = SCOPES.LEVEL_AND_JOKERS;
+
+  function getScopeKeys(scope, levelRank) {
+    scope = scope || DEFAULT_SCOPE;
+    levelRank = levelRank || DEFAULT_LEVEL_RANK;
+    if (scope === SCOPES.NINE) return RANKS.slice(0, 9);
+    if (scope === SCOPES.ALL) return ALL_KEYS.slice();
+    if (scope === SCOPES.LEVEL_AND_JOKERS) return getRowKeys(1, levelRank);
+    throw new Error('未知范围: ' + scope);
+  }
+
+  function createInitialCountsForScope(scope, levelRank) {
+    return createInitialCountsForKeys(getScopeKeys(scope, levelRank));
+  }
+
+  function scopeInitialTotal(scope, levelRank) {
+    return scopeInitialTotalForKeys(getScopeKeys(scope, levelRank));
+  }
+
+  function filterDeckByScope(deck, scope, levelRank) {
+    return filterDeckByKeys(deck, getScopeKeys(scope, levelRank));
+  }
+
+  function createDeckForScope(scope, levelRank) {
+    return createDeckForKeys(getScopeKeys(scope, levelRank));
+  }
+
+  function decrement(counts, key) {
+    if (ALL_KEYS.indexOf(key) === -1) throw new Error('未知点数: ' + key);
+    if (counts[key] <= 0) return false;
+    counts[key] -= 1;
+    return true;
   }
 
   return {
@@ -162,21 +230,35 @@
     COPIES_PER_RANK: COPIES_PER_RANK,
     COPIES_PER_JOKER: COPIES_PER_JOKER,
     TOTAL_CARDS: TOTAL_CARDS,
+    DEFAULT_LEVEL_RANK: DEFAULT_LEVEL_RANK,
+    UNLOCK_STREAK_NEED: UNLOCK_STREAK_NEED,
+    MAX_UNLOCKED_ROWS: MAX_UNLOCKED_ROWS,
     SCOPES: SCOPES,
     DEFAULT_SCOPE: DEFAULT_SCOPE,
-    DEFAULT_LEVEL_RANK: DEFAULT_LEVEL_RANK,
-    getScopeKeys: getScopeKeys,
+    getRowKeys: getRowKeys,
+    getUnlockedKeys: getUnlockedKeys,
+    clampRows: clampRows,
+    maxCopies: maxCopies,
+    cycleGuess: cycleGuess,
     createInitialCounts: createInitialCounts,
-    createInitialCountsForScope: createInitialCountsForScope,
+    createInitialCountsForKeys: createInitialCountsForKeys,
+    createZeroGuesses: createZeroGuesses,
     scopeInitialTotal: scopeInitialTotal,
+    scopeInitialTotalForKeys: scopeInitialTotalForKeys,
     totalRemaining: totalRemaining,
     decrement: decrement,
     createDeck: createDeck,
+    filterDeckByKeys: filterDeckByKeys,
+    createDeckForKeys: createDeckForKeys,
     filterDeckByScope: filterDeckByScope,
     createDeckForScope: createDeckForScope,
+    getScopeKeys: getScopeKeys,
+    createInitialCountsForScope: createInitialCountsForScope,
     shuffle: shuffle,
     countPlayed: countPlayed,
     trueRemaining: trueRemaining,
-    checkAnswer: checkAnswer
+    checkAnswer: checkAnswer,
+    applyStreakAfterCheck: applyStreakAfterCheck,
+    rowLabel: rowLabel
   };
 });
