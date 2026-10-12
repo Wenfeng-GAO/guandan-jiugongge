@@ -385,3 +385,202 @@ body {
   .cell { min-height: 84px; }
   body { padding: 12px 12px 28px; }
 }
+
+/* ===== v5：首页双入口 + 开局扫牌 + 数字直选 ===== */
+
+/* 视图顶栏（返回 + 关名） */
+.mode-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 16px;
+}
+.btn-back {
+  background: var(--cell);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--mute);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-back:active { transform: scale(0.97); }
+.mode-name-sm { font-size: 16px; font-weight: 600; color: var(--text); }
+.mode-topbar .streak-info { margin-left: auto; }
+
+/* 首页入口 */
+.entry-head { margin: 0 0 12px; }
+.entry-eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--mute);
+  margin-bottom: 4px;
+}
+.entry-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--text);
+}
+.entry-sub { font-size: 13px; color: var(--mute); margin-top: 4px; }
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  background: var(--cell);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  color: var(--text);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.mode-card:first-child { border: 1.5px solid rgba(242, 244, 247, 0.6); }
+.mode-card:active { transform: scale(0.98); }
+.mode-name { font-size: 16px; font-weight: 600; line-height: 20px; }
+.mode-desc { font-size: 13px; line-height: 16px; color: var(--mute); }
+.mode-tag { font-size: 11px; font-weight: 500; line-height: 14px; color: var(--amber); }
+
+/* 数字键（两关共用） */
+.num-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.num-btn {
+  height: 40px;
+  min-width: 44px;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--mute);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.num-btn.dense { min-width: 26px; padding: 0; }
+.num-btn:active:not(:disabled) { transform: scale(0.95); }
+.num-btn.selected { background: var(--text); border-color: var(--text); color: var(--bg); }
+.num-btn.ok { background: var(--ok); border-color: var(--ok); color: var(--bg); }
+.num-btn.bad { background: var(--bad); border-color: var(--bad); color: var(--bg); }
+.num-btn:disabled { cursor: default; }
+
+/* 闭卷：共享数字选择器 + 选中格 */
+.num-picker {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--cell);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.num-picker-label { font-size: 13px; color: var(--mute); margin-bottom: 8px; }
+.num-picker-label b { color: var(--text); }
+.cell.picked { border-color: var(--amber); }
+.cell.picked .hint { color: var(--amber); }
+
+/* 开局扫牌 */
+.scan-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 16px;
+}
+.scan-title { font-size: 16px; font-weight: 600; line-height: 20px; color: var(--text); }
+.scan-sub { font-size: 13px; line-height: 16px; color: var(--mute); margin-top: 4px; }
+.scan-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+.scan-timer-label { font-size: 11px; font-weight: 500; color: var(--mute); }
+.scan-countdown {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 28px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.scan-progress {
+  height: 4px;
+  margin-top: 8px;
+  background: var(--cell);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.scan-progress i {
+  display: block;
+  height: 4px;
+  width: 100%;
+  background: var(--text);
+  border-radius: 2px;
+}
+.scan-hand { display: flex; flex-wrap: wrap; gap: 6px 4px; margin-top: 12px; }
+.scan-card {
+  width: 26px;
+  height: 36px;
+  background: #fff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a1f;
+}
+.scan-card.red { color: #bf3333; }
+.scan-card.tight { font-size: 9px; }
+.scan-card.lvl { border: 2px solid var(--amber); }
+.scan-note { font-size: 11px; line-height: 14px; color: var(--mute); margin-top: 12px; }
+
+.scan-cover {
+  margin: 16px 0 12px;
+  padding: 12px;
+  background: var(--cell);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--mute);
+}
+.scan-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 12px;
+  background: var(--cell);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.scan-cell.ok { border: 1.5px solid var(--ok); background: rgba(31, 157, 85, 0.12); }
+.scan-cell.bad { border: 1.5px solid var(--bad); background: rgba(214, 69, 69, 0.12); }
+.scan-cell-head { display: flex; align-items: center; gap: 8px; }
+.scan-badge {
+  padding: 1px 4px;
+  background: var(--amber);
+  border-radius: 4px;
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+}
+.scan-cell-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.scan-cell-sub { font-size: 11px; color: var(--mute); }
+.scan-verdict { margin-left: auto; font-size: 11px; font-weight: 600; }
+.scan-cell.ok .scan-verdict { color: var(--ok); }
+.scan-cell.bad .scan-verdict { color: var(--bad); }
+.scan-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+
+@media (max-width: 360px) {
+  .mode-grid { gap: 6px; }
+  .mode-card { padding: 12px; }
+}

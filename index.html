@@ -4,71 +4,115 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0d10">
-  <meta name="description" content="掼蛋九宫格记牌练习：闭卷填剩余、三行渐进解锁、核对反馈">
+  <meta name="description" content="掼蛋九宫格记牌练习：开局扫牌 8 秒报外剩、出牌闭卷填剩余、三行渐进解锁">
   <title>掼蛋九宫格记牌练习</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="site-header">
-    <p class="eyebrow">品味稿 v4 · 闭卷练习</p>
-    <h1>掼蛋九宫格</h1>
-    <p class="subtitle">翻牌记 → 闭卷填剩余 → 核对</p>
-  </header>
+  <!-- 首页：选一关练 -->
+  <section id="view-home" class="view">
+    <header class="site-header">
+      <p class="eyebrow">品味稿 v5 · 开局扫牌 × 出牌闭卷</p>
+      <h1>掼蛋九宫格</h1>
+      <p class="subtitle">开局扫牌 · 8 秒报外剩 ｜ 出牌闭卷 · 翻牌记填剩余</p>
+    </header>
 
-  <details class="howto">
-    <summary>怎么玩</summary>
-    <div class="howto-body">
-      <p><strong>闭卷流程：</strong>点「新开一盘」洗牌，再「翻开下一张」逐张记牌（不要边看边减）。记够后点「闭卷填剩余」——已翻列表清空，只能点格子改最终剩余，再点「核对」。</p>
-      <p><strong>点改：</strong>已解锁格子点一下数字 +1，超过上限回到 0。灰行锁定，点击无效、不计分。</p>
-      <p><strong>三行升档：</strong>默认只练第 1 行（级牌 / 大王 / 小王）。连对 3 盘解锁第 2 行（A/K/Q），再连对 3 盘解锁第 3 行（J/10/9）。「级」跟随当前级牌。</p>
-      <p><strong>反馈：</strong>核对后正确格绿+✓，错误格红+✕并标「漏x·填y」；本盘剩余与对错显示在上方。</p>
+    <details class="howto">
+      <summary>怎么玩</summary>
+      <div class="howto-body">
+        <p><strong>开局扫牌：</strong>进关自动发 27 张手牌，按点数排好、级牌（含 ♥级 逢人配）描金框，只亮 8 秒，到点自动盖牌、不能回看。凭记忆填 级 / 大王 / 小王 的外剩（外面还剩几），直接点数字，点「核对」。</p>
+        <p><strong>扫牌反馈：</strong>每格绿 ✓ / 红 ✕ 并显示正确值。有错可「只重练错的格」（换新牌只考错格），全对进「下一盘」。不计分、不挂升档。</p>
+        <p><strong>出牌闭卷：</strong>点「新开一盘」洗牌，「翻开下一张」逐张记牌（不要边看边减）。「闭卷填剩余」后点格子选中，用下方数字键直接选剩余，再点「核对」。</p>
+        <p><strong>三行升档（出牌闭卷）：</strong>默认只练第 1 行（级 / 大王 / 小王）。连对 3 盘解锁第 2 行（A/K/Q），再连对 3 盘解锁第 3 行（J/10/9）。灰行预览不可点、不计分。「级」跟随当前级牌，两关共用上方设置。</p>
+      </div>
+    </details>
+
+    <section class="settings" aria-label="练习设置">
+      <div class="setting-row">
+        <label class="setting-label" for="level-select">级牌</label>
+        <select id="level-select" class="level-select" aria-label="选择当前级牌"></select>
+        <span class="streak-info">两关通用</span>
+      </div>
+    </section>
+
+    <div class="entry-head">
+      <p class="entry-eyebrow">入口</p>
+      <h2 class="entry-title">选一关练</h2>
+      <p class="entry-sub">两关并排，各练一件事</p>
     </div>
-  </details>
+    <div class="mode-grid">
+      <button type="button" class="mode-card" data-testid="entry-scan">
+        <span class="mode-name">开局扫牌</span>
+        <span class="mode-desc">闪手牌 8 秒 → 盖牌 → 填外剩</span>
+        <span class="mode-tag">档位 · 级牌&amp;王</span>
+      </button>
+      <button type="button" class="mode-card" data-testid="entry-closed">
+        <span class="mode-name">出牌闭卷</span>
+        <span class="mode-desc">翻牌记 → 闭卷 → 填最终剩余</span>
+        <span class="mode-tag">档位 · 级牌&amp;王</span>
+      </button>
+    </div>
 
-  <section class="settings" aria-label="练习设置">
-    <div class="setting-row">
-      <label class="setting-label" for="level-select">级牌</label>
-      <select id="level-select" class="level-select" aria-label="选择当前级牌"></select>
+    <footer class="site-footer">纯静态页面 · 打开即用 · 不保存任何数据</footer>
+  </section>
+
+  <!-- 开局扫牌 -->
+  <section id="view-scan" class="view hidden">
+    <div class="mode-topbar">
+      <div id="scan-back-slot"></div>
+      <span class="mode-name-sm">开局扫牌</span>
+    </div>
+    <div id="scan-root"></div>
+  </section>
+
+  <!-- 出牌闭卷 -->
+  <section id="view-closed" class="view hidden">
+    <div class="mode-topbar">
+      <div id="closed-back-slot"></div>
+      <span class="mode-name-sm">出牌闭卷</span>
       <span id="streak-info" class="streak-info" aria-live="polite">连对 0/3</span>
     </div>
+
+    <p id="row-label" class="row-label">档 · 级牌&amp;王 · 灰行升档预告</p>
+
+    <section class="stats" aria-label="本盘统计">
+      <div class="stat">
+        <span class="stat-label">本盘剩余</span>
+        <span id="stat-remain" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">对错</span>
+        <span id="stat-result" class="stat-value">—</span>
+      </div>
+    </section>
+
+    <section id="flip-panel" class="flip-panel">
+      <div id="current-card" class="card-back" aria-live="polite">洗</div>
+      <div class="flip-info">
+        <div class="flip-count">已翻 <b id="flip-count">0</b> / <span id="flip-total">12</span> 张</div>
+        <div id="last-cards" class="last-cards"></div>
+        <p id="phase-hint" class="phase-hint">先点「新开一盘」，再翻牌记牌</p>
+      </div>
+    </section>
+
+    <main class="grid-wrap">
+      <div id="map-grid" class="map-grid" aria-label="三行点数地图"></div>
+      <div id="num-picker" class="num-picker hidden">
+        <p class="num-picker-label">为 <b id="picker-key"></b> 选剩余</p>
+        <div id="picker-row" class="num-row"></div>
+      </div>
+    </main>
+
+    <section id="controls" class="controls">
+      <button id="btn-primary" class="btn btn-primary" type="button">新开一盘</button>
+      <button id="btn-secondary" class="btn btn-secondary" type="button" disabled>闭卷填剩余</button>
+    </section>
+
+    <div id="message" class="message" aria-live="polite"></div>
   </section>
-
-  <section class="stats" aria-label="本盘统计">
-    <div class="stat">
-      <span class="stat-label">本盘剩余</span>
-      <span id="stat-remain" class="stat-value">—</span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">对错</span>
-      <span id="stat-result" class="stat-value">—</span>
-    </div>
-  </section>
-
-  <p id="row-label" class="row-label">档 · 级牌&amp;王 · 灰行升档预告</p>
-
-  <section id="flip-panel" class="flip-panel">
-    <div id="current-card" class="card-back" aria-live="polite">洗</div>
-    <div class="flip-info">
-      <div class="flip-count">已翻 <b id="flip-count">0</b> / <span id="flip-total">12</span> 张</div>
-      <div id="last-cards" class="last-cards"></div>
-      <p id="phase-hint" class="phase-hint">先点「新开一盘」，再翻牌记牌</p>
-    </div>
-  </section>
-
-  <main class="grid-wrap">
-    <div id="map-grid" class="map-grid" aria-label="三行点数地图"></div>
-  </main>
-
-  <section id="controls" class="controls">
-    <button id="btn-primary" class="btn btn-primary" type="button">新开一盘</button>
-    <button id="btn-secondary" class="btn btn-secondary" type="button" disabled>闭卷填剩余</button>
-  </section>
-
-  <div id="message" class="message" aria-live="polite"></div>
-
-  <footer class="site-footer">纯静态页面 · 打开即用 · 不保存任何数据</footer>
 
   <script src="logic.js"></script>
+  <script src="scan.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
