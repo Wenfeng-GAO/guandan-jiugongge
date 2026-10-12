@@ -30,4 +30,8 @@ python3 -m http.server 8000
 
 ## 如何部署
 
-推到 GitHub 仓库后，在 Settings → Pages 里选择 `main` 分支的根目录即可，几秒后就能通过 Pages 地址访问。
+已启用 GitHub Pages（`main` 分支根目录）。
+
+在线访问：https://wenfeng-gao.github.io/guandan-jiugongge/
+
+仓库：https://github.com/Wenfeng-GAO/guandan-jiugongge
