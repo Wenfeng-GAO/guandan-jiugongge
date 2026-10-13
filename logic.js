@@ -1,5 +1,6 @@
 /* 掼蛋九宫格记牌练习 - 纯逻辑层（浏览器与 Node 共用）
  * v4：闭卷填剩余 + 三行渐进解锁（级/王 → A/K/Q → J/10/9）
+ * v5：开局扫牌 — 花色牌堆 / 逢人配随级 / 外剩三格
  */
 (function (global, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -11,10 +12,13 @@
   'use strict';
 
   var RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  var SUITS = ['♠', '♥', '♣', '♦'];
   var SMALL_JOKER = '小王';
   var BIG_JOKER = '大王';
   var JOKERS = [SMALL_JOKER, BIG_JOKER];
   var ALL_KEYS = RANKS.concat(JOKERS);
+  var SCAN_KEYS = ['level', 'big', 'small'];
+  var DEFAULT_HAND_SIZE = 27;
 
   var COPIES_PER_RANK = 8;
   var COPIES_PER_JOKER = 2;
@@ -112,6 +116,115 @@
       deck.push(SMALL_JOKER, BIG_JOKER);
     }
     return deck;
+  }
+
+  function createSuitedDeck() {
+    var deck = [];
+    for (var d = 0; d < 2; d++) {
+      RANKS.forEach(function (r) {
+        SUITS.forEach(function (s) {
+          deck.push({ rank: r, suit: s, id: d + '-' + s + '-' + r });
+        });
+      });
+      deck.push({ rank: SMALL_JOKER, suit: null, id: d + '-' + SMALL_JOKER });
+      deck.push({ rank: BIG_JOKER, suit: null, id: d + '-' + BIG_JOKER });
+    }
+    return deck;
+  }
+
+  function isWild(card, levelRank) {
+    return card.suit === '♥' && card.rank === levelRank;
+  }
+
+  function isLevelCard(card, levelRank) {
+    return card.rank === levelRank;
+  }
+
+  function dealHand(rng, n) {
+    if (n == null) n = DEFAULT_HAND_SIZE;
+    return shuffle(createSuitedDeck(), rng).slice(0, n);
+  }
+
+  function outsideCounts(hand, levelRank) {
+    var nLevel = 0;
+    var nBig = 0;
+    var nSmall = 0;
+    hand.forEach(function (c) {
+      if (c.rank === levelRank) nLevel += 1;
+      else if (c.rank === BIG_JOKER) nBig += 1;
+      else if (c.rank === SMALL_JOKER) nSmall += 1;
+    });
+    return {
+      level: COPIES_PER_RANK - nLevel,
+      big: COPIES_PER_JOKER - nBig,
+      small: COPIES_PER_JOKER - nSmall
+    };
+  }
+
+  function shouldRedeal(outside) {
+    return outside.level === COPIES_PER_RANK &&
+      outside.big === COPIES_PER_JOKER &&
+      outside.small === COPIES_PER_JOKER;
+  }
+
+  function dealScanHand(levelRank, rng) {
+    var redeals = 0;
+    var hand;
+    var outside;
+    do {
+      if (hand) redeals += 1;
+      hand = dealHand(rng);
+      outside = outsideCounts(hand, levelRank);
+    } while (shouldRedeal(outside));
+    return {
+      hand: sortHand(hand, levelRank),
+      outside: outside,
+      redeals: redeals
+    };
+  }
+
+  function sortStrength(rank, levelRank) {
+    if (rank === BIG_JOKER) return 0;
+    if (rank === SMALL_JOKER) return 1;
+    if (rank === levelRank) return 2;
+    var desc = RANKS.slice().reverse();
+    var idx = desc.indexOf(rank);
+    return idx === -1 ? 100 : 3 + idx;
+  }
+
+  function suitTieIndex(suit) {
+    var i = SUITS.indexOf(suit);
+    return i === -1 ? SUITS.length : i;
+  }
+
+  function sortHand(hand, levelRank) {
+    return hand.slice().sort(function (a, b) {
+      var sa = sortStrength(a.rank, levelRank);
+      var sb = sortStrength(b.rank, levelRank);
+      if (sa !== sb) return sa - sb;
+      if (a.rank === levelRank) {
+        var aw = isWild(a, levelRank) ? 0 : 1;
+        var bw = isWild(b, levelRank) ? 0 : 1;
+        if (aw !== bw) return aw - bw;
+      }
+      return suitTieIndex(a.suit) - suitTieIndex(b.suit);
+    });
+  }
+
+  function numberOptions(key) {
+    var max = maxCopies(key);
+    var opts = [];
+    for (var i = 0; i <= max; i++) opts.push(i);
+    return opts;
+  }
+
+  function checkScan(guesses, outside, keys) {
+    keys = keys || SCAN_KEYS;
+    return keys.map(function (key) {
+      var user = guesses[key];
+      var truth = outside[key];
+      return { key: key, user: user, truth: truth, ok: user === truth };
+    });
   }
 
   function filterDeckByKeys(deck, keys) {
@@ -223,6 +336,7 @@
 
   return {
     RANKS: RANKS,
+    SUITS: SUITS,
     JOKERS: JOKERS,
     ALL_KEYS: ALL_KEYS,
     SMALL_JOKER: SMALL_JOKER,
@@ -259,6 +373,16 @@
     trueRemaining: trueRemaining,
     checkAnswer: checkAnswer,
     applyStreakAfterCheck: applyStreakAfterCheck,
-    rowLabel: rowLabel
+    rowLabel: rowLabel,
+    createSuitedDeck: createSuitedDeck,
+    isWild: isWild,
+    isLevelCard: isLevelCard,
+    dealHand: dealHand,
+    outsideCounts: outsideCounts,
+    shouldRedeal: shouldRedeal,
+    dealScanHand: dealScanHand,
+    sortHand: sortHand,
+    numberOptions: numberOptions,
+    checkScan: checkScan
   };
 });

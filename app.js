@@ -1,4 +1,4 @@
-/* 掼蛋九宫格记牌练习 - 界面交互（v4 闭卷填剩余） */
+/* 掼蛋九宫格记牌练习 - 出牌闭卷（v5：闭卷填剩余 + 三行渐进解锁，数字直选替代 +1 循环） */
 /* global GuandanLogic */
 (function () {
   'use strict';
@@ -13,6 +13,7 @@
     streak: 0,
     activeKeys: [],
     guesses: {},
+    selectedKey: null, // filling 阶段选中的格子（下方数字键给它选剩余）
     deck: [],
     flipIndex: 0,
     lastWrong: [],
@@ -22,7 +23,7 @@
   state.activeKeys = L.getUnlockedKeys(state.roundRows, state.levelRank);
   state.guesses = L.createZeroGuesses(state.activeKeys);
 
-  // 固定 3×3 展示格：每格 { row, keyOrNull, label }
+  // 固定 3×3 展示格：每格 { row, kind, key }
   // 行1 col0 的 key 跟随级牌
   var CELL_DEFS = [
     { row: 1, kind: 'level' },
@@ -43,7 +44,8 @@
     [
       'level-select', 'streak-info', 'stat-remain', 'stat-result', 'row-label',
       'flip-panel', 'current-card', 'flip-count', 'flip-total', 'last-cards', 'phase-hint',
-      'map-grid', 'btn-primary', 'btn-secondary', 'message'
+      'map-grid', 'btn-primary', 'btn-secondary', 'message',
+      'num-picker', 'picker-key', 'picker-row', 'closed-back-slot'
     ].forEach(function (id) { els[id] = $(id); });
   }
 
@@ -152,7 +154,7 @@
       els['current-card'].className = 'card-back';
       els['last-cards'].textContent = '';
       if (state.phase === 'filling') {
-        els['phase-hint'].textContent = '牌面已收 · 点格子改剩余 · 满意后核对';
+        els['phase-hint'].textContent = '牌面已收 · 点格子选中 · 下方数字键选剩余';
       } else {
         els['phase-hint'].textContent = '本盘结束 · 灰行不计分';
       }
@@ -200,6 +202,7 @@
       var hintEl = cell.querySelector('.hint');
 
       cell.className = 'cell';
+      cell.setAttribute('data-testid', 'cell-closed-' + key);
       if (def.kind === 'level') cell.classList.add('is-level');
       rankEl.textContent = cellLabel(def);
 
@@ -220,7 +223,12 @@
 
       if (state.phase === 'filling') {
         countEl.textContent = String(state.guesses[key] || 0);
-        hintEl.textContent = '点改';
+        if (key === state.selectedKey) {
+          cell.classList.add('picked');
+          hintEl.textContent = '已选';
+        } else {
+          hintEl.textContent = '点选';
+        }
         return;
       }
 
@@ -243,6 +251,39 @@
         }
       }
     });
+  }
+
+  // filling 阶段：选中格 → 下方共享数字键直接选剩余
+  function renderPicker() {
+    var picker = els['num-picker'];
+    if (state.phase !== 'filling' || !state.selectedKey) {
+      picker.classList.add('hidden');
+      return;
+    }
+    picker.classList.remove('hidden');
+    var key = state.selectedKey;
+    els['picker-key'].textContent = key;
+    var row = els['picker-row'];
+    row.innerHTML = '';
+    var opts = L.numberOptions(key);
+    var dense = opts.length > 4;
+    opts.forEach(function (n) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'num-btn' + (dense ? ' dense' : '');
+      if (state.guesses[key] === n) b.classList.add('selected');
+      b.setAttribute('data-testid', 'pick-' + n);
+      b.textContent = String(n);
+      b.addEventListener('click', function () { onPickNumber(key, n); });
+      row.appendChild(b);
+    });
+  }
+
+  function onPickNumber(key, n) {
+    if (state.phase !== 'filling') return;
+    state.guesses[key] = n;
+    showMessage('');
+    render();
   }
 
   function renderButtons() {
@@ -295,6 +336,7 @@
     renderStats();
     renderFlip();
     renderCells();
+    renderPicker();
     renderButtons();
   }
 
@@ -302,8 +344,7 @@
     if (state.phase !== 'filling') return;
     var def = CELL_DEFS[index];
     if (!isRowUnlocked(def.row)) return;
-    var key = cellKey(def);
-    state.guesses[key] = L.cycleGuess(state.guesses[key] || 0, key);
+    state.selectedKey = cellKey(def);
     showMessage('');
     render();
   }
@@ -314,6 +355,7 @@
     state.deck = L.shuffle(L.createDeckForKeys(state.activeKeys));
     state.flipIndex = 0;
     state.guesses = L.createZeroGuesses(state.activeKeys);
+    state.selectedKey = null;
     state.lastWrong = [];
     state.lastTruth = null;
     state.justUnlocked = false;
@@ -344,8 +386,9 @@
       return;
     }
     state.guesses = L.createZeroGuesses(state.activeKeys);
+    state.selectedKey = null;
     state.phase = 'filling';
-    showMessage('牌面已收。点格子改最终剩余，满意后点「核对」。', 'info');
+    showMessage('牌面已收。点格子选中，用下方数字键直接选剩余，满意后点「核对」。', 'info');
     render();
   }
 
@@ -356,6 +399,7 @@
     var truth = L.trueRemaining(played);
     state.lastWrong = wrong;
     state.lastTruth = truth;
+    state.selectedKey = null;
     state.phase = 'done';
 
     var allCorrect = wrong.length === 0;
@@ -414,12 +458,47 @@
     state.deck = [];
     state.flipIndex = 0;
     state.guesses = L.createZeroGuesses(state.activeKeys);
+    state.selectedKey = null;
     state.lastWrong = [];
     state.lastTruth = null;
     state.phase = 'idle';
     showMessage('级牌已设为「' + rank + '」，请重新「新开一盘」。', 'info');
     render();
   }
+
+  function makeBackButton(onBack) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-back';
+    b.setAttribute('data-testid', 'btn-back');
+    b.textContent = '← 返回';
+    b.addEventListener('click', onBack);
+    return b;
+  }
+
+  function enterClosed() {
+    var slot = els['closed-back-slot'];
+    slot.innerHTML = '';
+    slot.appendChild(makeBackButton(goHome));
+    window.GuandanNav.show('closed');
+    render();
+  }
+
+  function goHome() {
+    els['closed-back-slot'].innerHTML = '';
+    window.GuandanNav.show('home');
+  }
+
+  window.__closedDebug = {
+    truth: function () {
+      var played = state.deck.slice(0, state.flipIndex);
+      var t = L.trueRemaining(played);
+      var out = {};
+      state.activeKeys.forEach(function (k) { out[k] = t[k]; });
+      return out;
+    },
+    state: state
+  };
 
   function init() {
     grabElements();
@@ -434,6 +513,8 @@
     els['level-select'].addEventListener('change', function () { changeLevel(this.value); });
     els['btn-primary'].addEventListener('click', onPrimary);
     els['btn-secondary'].addEventListener('click', onSecondary);
+    var entry = document.querySelector('[data-testid="entry-closed"]');
+    if (entry) entry.addEventListener('click', enterClosed);
     render();
   }
 

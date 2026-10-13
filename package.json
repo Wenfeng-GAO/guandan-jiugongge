@@ -1,0 +1,7 @@
+{
+  "name": "guandan-jiugongge",
+  "private": true,
+  "scripts": {
+    "test": "node check.js && node test/scan.test.js"
+  }
+}
