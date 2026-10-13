@@ -234,6 +234,11 @@
     state.lastTruth = null;
     state.justUnlocked = false;
     state.phase = 'flipping';
+    var s = window.GuandanSession;
+    if (s) {
+      s.setAnswering(false);
+      s.roundStarted('closed');
+    }
     showMessage('新牌已洗好：范围内共 ' + state.deck.length + ' 张。翻牌记牌，不要边看边减。', 'info');
     render();
   }
@@ -260,6 +265,8 @@
       return;
     }
     state.phase = 'filling';
+    var s = window.GuandanSession;
+    if (s) s.setAnswering(true);
     showMessage('牌面已收。点格子选中，用下方数字键直接选剩余，满意后点「核对」。', 'info');
     render();
   }
@@ -280,6 +287,11 @@
     state.phase = 'done';
 
     var allCorrect = wrong.length === 0;
+    var s = window.GuandanSession;
+    if (s) {
+      s.setAnswering(false);
+      s.roundFinished('closed', allCorrect);
+    }
     var prog = L.applyStreakAfterCheck(state.unlockedRows, state.streak, allCorrect);
     state.unlockedRows = prog.unlockedRows;
     state.streak = prog.streak;

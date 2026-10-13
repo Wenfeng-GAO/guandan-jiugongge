@@ -124,10 +124,45 @@
     <div id="sim-root"></div>
   </section>
 
+  <!-- 小结：这一场计时结束（一屏） -->
+  <section id="view-summary" class="view hidden">
+    <header class="sum-head">
+      <p class="eyebrow">小结</p>
+      <h1 id="summary-title" class="sum-title">这一场 15 分钟</h1>
+    </header>
+
+    <div class="sum-hero">
+      <div id="summary-total" class="sum-big" data-testid="summary-total">0 盘</div>
+      <div id="summary-correct" class="sum-sub" data-testid="summary-correct">全对 0 盘</div>
+    </div>
+
+    <div class="sum-rows">
+      <div class="sum-row" data-testid="summary-row-scan">
+        <span class="sum-row-name">开局扫牌<span class="sum-row-sug">建议 3 分钟</span></span>
+        <span class="sum-row-val">—</span>
+      </div>
+      <div class="sum-row" data-testid="summary-row-closed">
+        <span class="sum-row-name">出牌闭卷<span class="sum-row-sug">建议 5 分钟</span></span>
+        <span class="sum-row-val">—</span>
+      </div>
+      <div class="sum-row" data-testid="summary-row-sim">
+        <span class="sum-row-name">实战模拟<span class="sum-row-sug">建议 7 分钟</span></span>
+        <span class="sum-row-val">—</span>
+      </div>
+    </div>
+
+    <div class="sum-actions">
+      <button type="button" class="btn btn-primary" data-testid="summary-again">再来 15 分钟</button>
+      <button type="button" class="btn btn-secondary" data-testid="summary-home">回首页</button>
+    </div>
+  </section>
+
   <script src="logic.js"></script>
   <script src="grid.js"></script>
   <script src="scan.js"></script>
   <script src="app.js"></script>
   <script src="sim.js"></script>
+  <script src="timer.js"></script>
+  <script src="session.js"></script>
 </body>
 </html>

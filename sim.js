@@ -177,25 +177,35 @@
     root.appendChild(panel);
   }
 
+  function enterStop() {
+    state.phase = 'stop';
+    var s = window.GuandanSession;
+    if (s) s.setAnswering(true);
+    render();
+  }
+
+  function armFlipTimeout() {
+    if (state.phase !== 'flip') return;
+    state.flipTimeout = setTimeout(function () {
+      state.flipTimeout = null;
+      if (state.flipIndex >= state.round.n) {
+        enterStop();
+      } else {
+        scheduleNextFlip();
+      }
+    }, state.flipMs);
+  }
+
   function scheduleNextFlip() {
     if (state.phase !== 'flip') return;
     if (state.flipIndex >= state.round.n) {
-      state.phase = 'stop';
-      render();
+      enterStop();
       return;
     }
     // 先翻一张再渲染：舞台始终展示 flips[flipIndex-1]（当前亮着的牌）
     state.flipIndex += 1;
     render();
-    state.flipTimeout = setTimeout(function () {
-      state.flipTimeout = null;
-      if (state.flipIndex >= state.round.n) {
-        state.phase = 'stop';
-        render();
-      } else {
-        scheduleNextFlip();
-      }
-    }, state.flipMs);
+    armFlipTimeout();
   }
 
   // —— 状态 03 随机停牌 · 闭卷作答 ——
@@ -370,6 +380,11 @@
     state.streakState = L.applySimStreak(state.streakState, state.wrongKeys.length === 0);
     state.reviewing = false;
     state.phase = 'feedback';
+    var s = window.GuandanSession;
+    if (s) {
+      s.setAnswering(false);
+      s.roundFinished('sim', state.wrongKeys.length === 0);
+    }
     render();
   }
 
@@ -385,7 +400,29 @@
     state.gridGuesses = null;
     state.reviewing = false;
     state.phase = 'flash';
+    var s = window.GuandanSession;
+    if (s) {
+      s.setAnswering(false);
+      s.roundStarted('sim');
+    }
     render();
+  }
+
+  // v7：闪牌 / 自动翻牌期间暂停 → 停表盖住；恢复 → 闪牌重闪完整 8 秒，
+  // 翻牌从停下的那张（flipIndex 不变）继续，不重开这盘
+  function onSessionPause() {
+    if (state.phase === 'flash' || state.phase === 'flip') stopTimers();
+  }
+
+  function onSessionResume() {
+    if (state.phase === 'flash') {
+      render(); // render 会重开完整 8 秒闪牌计时
+      return;
+    }
+    if (state.phase === 'flip') {
+      render();          // 重亮当前这张，细进度条从头走
+      armFlipTimeout();
+    }
   }
 
   function goHome() {
@@ -420,6 +457,11 @@
     els.root = document.getElementById('sim-root');
     var entry = document.querySelector('[data-testid="entry-sim"]');
     if (entry) entry.addEventListener('click', enterSim);
+    var s = window.GuandanSession;
+    if (s) {
+      s.onPause(onSessionPause);
+      s.onResume(onSessionResume);
+    }
     render();
   }
 
