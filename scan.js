@@ -210,6 +210,19 @@
       checkBtn.addEventListener('click', check);
       actions.appendChild(checkBtn);
     } else {
+      var s = S();
+      if (s && s.isSummaryReady()) {
+        // v7.1：小结就绪 → 下一盘/只重练错格都成空操作，换成「看小结」
+        var vs = document.createElement('button');
+        vs.type = 'button';
+        vs.className = 'btn btn-primary';
+        vs.setAttribute('data-testid', 'btn-view-summary');
+        vs.textContent = '看小结';
+        vs.addEventListener('click', function () { s.showSummary(); });
+        actions.appendChild(vs);
+        panel.appendChild(actions);
+        return;
+      }
       var hasWrong = state.wrongKeys.length > 0;
       var next = document.createElement('button');
       next.type = 'button';
@@ -325,6 +338,7 @@
     if (s) {
       s.onPause(onSessionPause);
       s.onResume(onSessionResume);
+      s.onSummaryReady(function () { if (state.phase === 'feedback') render(); });
     }
     render();
   }

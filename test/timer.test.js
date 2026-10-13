@@ -306,4 +306,43 @@ t.tick();
 assert.strictEqual(t.getState().status, 'running');
 assert.strictEqual(t.getState().elapsedMs, 2000);
 
+
+
+// —— v7.1：暂停后「回首页」（无 API）保持暂停、不重置 ——
+clock = clockNow();
+t = GuandanTimer.create({ durationMs: 60 * 1000, now: clock });
+t.roundStarted('scan');
+clock.add(5000);
+t.tick();
+t.pause('manual');
+var remPaused = t.getState().remainingMs;
+assert.strictEqual(t.getState().status, 'paused');
+// 模拟回首页：不调任何 timer API，时钟继续走
+clock.add(15000);
+t.tick();
+assert.strictEqual(t.getState().status, 'paused', '回首页不调 API，应仍暂停');
+assert.strictEqual(t.getState().remainingMs, remPaused, '暂停期间剩余时间冻结');
+// 再进关：roundStarted 不解除暂停
+t.roundStarted('closed');
+assert.strictEqual(t.getState().status, 'paused', '再进关仍暂停');
+t.resume();
+assert.strictEqual(t.getState().status, 'running');
+clock.add(5000);
+t.tick();
+assert.strictEqual(t.getState().remainingMs, remPaused - 5000, '▶ 从同一剩余时间继续');
+
+// —— v7.1：时间到核对后进 summary（「看小结」由 UI 点开，timer 只给状态） ——
+clock = clockNow();
+t = GuandanTimer.create({ durationMs: 3000, now: clock });
+var ev71 = collect(t);
+t.roundStarted('scan');
+clock.add(4000);
+t.tick();
+assert.strictEqual(t.getState().status, 'timeup');
+assert.strictEqual(t.getState().label, '时间到 · 打完这盘');
+assert.ok(types(ev71).indexOf('summary') === -1, '盘未结束不应出小结');
+t.roundFinished('scan', true);
+assert.strictEqual(t.getState().status, 'summary', '核对后才 summary；导航由 UI 点「看小结」触发');
+assert.ok(types(ev71).indexOf('summary') !== -1);
+
 console.log('OK：timer.test.js 全部通过');

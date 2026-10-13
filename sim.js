@@ -312,13 +312,25 @@
     if (state.reviewing) panel.appendChild(renderReviewList());
 
     var actions = div('scan-actions');
-    var next = document.createElement('button');
-    next.type = 'button';
-    next.className = 'btn btn-primary';
-    next.setAttribute('data-testid', 'btn-next');
-    next.textContent = '下一盘';
-    next.addEventListener('click', function () { startRound(); });
-    actions.appendChild(next);
+    var s = window.GuandanSession;
+    if (s && s.isSummaryReady()) {
+      // v7.1：小结就绪 → 「下一盘」成空操作，换成「看小结」（回看翻过的牌保留）
+      var vs = document.createElement('button');
+      vs.type = 'button';
+      vs.className = 'btn btn-primary';
+      vs.setAttribute('data-testid', 'btn-view-summary');
+      vs.textContent = '看小结';
+      vs.addEventListener('click', function () { s.showSummary(); });
+      actions.appendChild(vs);
+    } else {
+      var next = document.createElement('button');
+      next.type = 'button';
+      next.className = 'btn btn-primary';
+      next.setAttribute('data-testid', 'btn-next');
+      next.textContent = '下一盘';
+      next.addEventListener('click', function () { startRound(); });
+      actions.appendChild(next);
+    }
     var review = document.createElement('button');
     review.type = 'button';
     review.className = 'btn btn-secondary';
@@ -461,6 +473,7 @@
     if (s) {
       s.onPause(onSessionPause);
       s.onResume(onSessionResume);
+      s.onSummaryReady(function () { if (state.phase === 'feedback') render(); });
     }
     render();
   }
