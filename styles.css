@@ -226,8 +226,8 @@ body {
   line-height: 1.4;
 }
 
-/* 3×3 地图 */
-.map-grid {
+/* 3×3 作答九宫格（v6.1 修订稿，三关共用） */
+.ans-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
@@ -237,91 +237,78 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: space-between;
   gap: 4px;
-  min-height: 92px;
-  padding: 8px 4px;
+  height: 76px;
+  padding: 8px;
   background: var(--cell);
-  border: 1.5px solid rgba(242, 244, 247, 0.35);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   color: var(--text);
 }
+
 .cell:active:not(.locked):not(.done) { transform: scale(0.96); }
 
-.cell .mark {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--mute);
-  line-height: 14px;
-}
-.cell .rank {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--mute);
-  line-height: 14px;
-}
-.cell .count {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 28px;
-  color: var(--text);
-}
-.cell .hint {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--mute);
-  line-height: 14px;
-  min-height: 14px;
-}
-
-.cell .lv {
-  display: none;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--bg);
-  background: var(--amber);
-  border-radius: 4px;
-  padding: 1px 4px;
-  line-height: 14px;
-}
-.cell.is-level .lv { display: inline-block; }
-.cell.is-level .mark-row {
+.cell .ans-cell-head {
   display: flex;
   align-items: center;
   gap: 4px;
+  width: 100%;
+  min-height: 14px;
+}
+.cell .ans-cell-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 14px;
 }
 
-/* 锁定行 */
+/* 数值行（右对齐）：作答值 / 锁定 ▢ / 错格「用户值 → 正确值」 */
+.cell .ans-cell-val { width: 100%; text-align: right; line-height: 28px; }
+.cell .count {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.cell .count.empty { color: var(--mute); }
+.cell .ans-fix { font-size: 11px; font-weight: 600; }
+.cell.wrong .ans-fix { color: var(--bad); }
+.cell.ok .ans-fix { color: var(--ok); }
+
+/* 判定 ✓/✕ 标在格名旁（仅反馈阶段显示） */
+.cell .ans-verdict {
+  display: none;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 14px;
+}
+.cell.done .ans-verdict { display: inline; }
+.cell.ok .ans-verdict { color: var(--ok); }
+.cell.wrong .ans-verdict { color: var(--bad); }
+
+/* 锁定格（未开放）：原位灰显、虚线灰框 + ▢ */
 .cell.locked {
   background: var(--surface);
-  border-color: rgba(46, 54, 65, 0.7);
+  border: 1px dashed var(--border);
+  color: var(--lock);
   cursor: not-allowed;
 }
-.cell.locked .mark,
-.cell.locked .rank,
-.cell.locked .count {
-  color: var(--lock);
-}
-.cell.locked .hint { color: var(--mute); }
+.cell.locked .ans-cell-name,
+.cell.locked .count { color: var(--lock); }
+.cell.locked .count { font-size: 13px; font-weight: 600; }
 
-/* 核对反馈 */
+/* 核对反馈：绿/红描边 + 同色薄底 */
 .cell.ok {
-  border-color: var(--ok);
-  border-width: 2px;
+  border: 1.5px solid var(--ok);
+  background: rgba(31, 157, 85, 0.12);
 }
-.cell.ok .hint { color: var(--ok); }
-.cell.ok .count { color: var(--text); }
-
 .cell.wrong {
-  border-color: var(--bad);
-  border-width: 2px;
+  border: 1.5px solid var(--bad);
+  background: rgba(214, 69, 69, 0.12);
 }
-.cell.wrong .count { color: var(--bad); }
-.cell.wrong .hint { color: var(--bad); }
 
 .cell.done { cursor: default; }
 .cell.done:active { transform: none; }
@@ -382,7 +369,6 @@ body {
 .hidden { display: none !important; }
 
 @media (max-width: 360px) {
-  .cell { min-height: 84px; }
   body { padding: 12px 12px 28px; }
 }
 
@@ -451,7 +437,7 @@ body {
 .mode-desc { font-size: 13px; line-height: 16px; color: var(--mute); }
 .mode-tag { font-size: 11px; font-weight: 500; line-height: 14px; color: var(--amber); }
 
-/* 数字键（两关共用） */
+/* 数字键（三关共用） */
 .num-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .num-btn {
   height: 40px;
@@ -474,18 +460,8 @@ body {
 .num-btn.bad { background: var(--bad); border-color: var(--bad); color: var(--bg); }
 .num-btn:disabled { cursor: default; }
 
-/* 闭卷：共享数字选择器 + 选中格 */
-.num-picker {
-  margin-top: 12px;
-  padding: 12px;
-  background: var(--cell);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.num-picker-label { font-size: 13px; color: var(--mute); margin-bottom: 8px; }
-.num-picker-label b { color: var(--text); }
-.cell.picked { border-color: var(--amber); }
-.cell.picked .hint { color: var(--amber); }
+/* 选中格：白色 2px 实框（v6.1） */
+.cell.picked { border: 2px solid var(--text); }
 
 /* 开局扫牌 */
 .scan-panel {
@@ -551,19 +527,6 @@ body {
   font-size: 13px;
   color: var(--mute);
 }
-.scan-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 12px;
-  background: var(--cell);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.scan-cell.ok { border: 1.5px solid var(--ok); background: rgba(31, 157, 85, 0.12); }
-.scan-cell.bad { border: 1.5px solid var(--bad); background: rgba(214, 69, 69, 0.12); }
-.scan-cell-head { display: flex; align-items: center; gap: 8px; }
 .scan-badge {
   padding: 1px 4px;
   background: var(--amber);
@@ -573,12 +536,118 @@ body {
   font-weight: 700;
   line-height: 14px;
 }
-.scan-cell-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.scan-cell-sub { font-size: 11px; color: var(--mute); }
-.scan-verdict { margin-left: auto; font-size: 11px; font-weight: 600; }
-.scan-cell.ok .scan-verdict { color: var(--ok); }
-.scan-cell.bad .scan-verdict { color: var(--bad); }
 .scan-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+
+/* ===== v6：统一作答九宫格 + 实战模拟 ===== */
+
+/* 点格后九宫格下方弹出的数字键（深色垫：标签 + 等分数字 chips） */
+.ans-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--cell);
+  border-radius: var(--radius);
+}
+.ans-picker-label { font-size: 11px; color: var(--mute); }
+.ans-picker-row { gap: 3px; }
+.ans-picker-row .num-btn { flex: 1; height: 44px; }
+
+/* 实战模拟：大牌舞台 / 细进度条 / 停牌 / 三段反馈 / 回看 */
+.sim-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 24px 12px;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+.sim-flip-card {
+  width: 88px;
+  height: 124px;
+  background: #fff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a1f;
+}
+.sim-flip-card.red { color: #bf3333; }
+.sim-flip-card.tight { font-size: 19px; }
+.sim-flip-card.lvl { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sim-stage-label { font-size: 11px; color: var(--mute); }
+.sim-beat {
+  height: 2px;
+  margin-top: 12px;
+  background: var(--cell);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.sim-beat i {
+  display: block;
+  height: 2px;
+  width: 0;
+  background: var(--mute);
+  border-radius: 1px;
+}
+.sim-stop {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--cell);
+  border-radius: 6px;
+  text-align: center;
+}
+.sim-stop-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.sim-stop-sub { font-size: 12px; color: var(--mute); margin-top: 4px; }
+.sim-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--cell);
+  border-radius: 6px;
+}
+.sim-bd-line { font-size: 12px; line-height: 16px; color: var(--mute); }
+.sim-bd-line:last-child { color: var(--text); font-weight: 600; }
+.sim-streak-note { font-size: 11px; line-height: 14px; color: var(--amber); margin-top: 4px; }
+.sim-review {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--cell);
+  border-radius: 6px;
+}
+.sim-review-chip {
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 600;
+}
+.sim-review-chip.latest { border-color: var(--amber); color: var(--amber); }
+.sim-review-chip.lvl { border-color: var(--amber); }
+.sim-review-chip.lvl.latest { color: var(--amber); }
+
+.mode-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.mode-grid-3 .mode-card { padding: 12px; }
+.mode-grid-3 .mode-name { font-size: 15px; }
+.mode-grid-3 .mode-desc { font-size: 12px; line-height: 15px; }
+.mode-grid-3 .mode-tag { font-size: 10px; }
+
+@media (max-width: 360px) {
+  .mode-grid-3 { gap: 6px; }
+  .mode-grid-3 .mode-card { padding: 10px 8px; }
+}
 
 @media (max-width: 360px) {
   .mode-grid { gap: 6px; }

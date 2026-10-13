@@ -1,17 +1,12 @@
-/* 掼蛋九宫格记牌练习 - 开局扫牌（v5：8 秒闪牌 → 盖牌 → 填外剩 → 只重练错格） */
-/* global GuandanLogic */
+/* 掼蛋九宫格记牌练习 - 开局扫牌（v6：8 秒闪牌 → 盖牌 → 统一九宫格填外剩 → 只重练错格） */
+/* global GuandanLogic, GuandanGrid */
 (function () {
   'use strict';
   var L = GuandanLogic;
+  var G = GuandanGrid;
 
   var FLASH_MS = 8000;
   var SCAN_KEYS = ['level', 'big', 'small'];
-
-  var KEY_META = {
-    level: { testid: 'cell-level', badge: true, name: function (s) { return s.levelRank; } },
-    big: { testid: 'cell-big', badge: false, name: function () { return L.BIG_JOKER; } },
-    small: { testid: 'cell-small', badge: false, name: function () { return L.SMALL_JOKER; } }
-  };
 
   // phase: off | flash | answer | feedback
   var state = {
@@ -20,7 +15,7 @@
     hand: [],
     outside: null,
     askedKeys: SCAN_KEYS.slice(),
-    guesses: {},
+    grid: null,
     results: null,
     wrongKeys: [],
     timerId: null,
@@ -29,10 +24,10 @@
 
   var els = {};
 
-  // —— 视图切换（app.js 共用；scan.js 先于 app.js 加载） ——
+  // —— 视图切换（grid.js → scan.js → app.js / sim.js 共用；scan.js 先于 app.js 加载） ——
   window.GuandanNav = {
     show: function (name) {
-      ['home', 'scan', 'closed'].forEach(function (v) {
+      ['home', 'scan', 'closed', 'sim'].forEach(function (v) {
         var node = document.getElementById('view-' + v);
         if (node) node.classList.toggle('hidden', v !== name);
       });
@@ -148,74 +143,16 @@
     root.appendChild(panel);
   }
 
-  // —— 盖牌填外剩 / 反馈 ——
-  // 考键 → numberOptions 用的点数键：级 → 当前级牌，王 → 大小王
-  function optionsKey(scanKey) {
-    if (scanKey === 'level') return state.levelRank;
-    if (scanKey === 'big') return L.BIG_JOKER;
-    return L.SMALL_JOKER;
-  }
-
-  function findResult(key) {
-    if (!state.results) return null;
-    for (var i = 0; i < state.results.length; i++) {
-      if (state.results[i].key === key) return state.results[i];
+  // —— 盖牌填外剩 / 反馈（统一九宫格作答） ——
+  function destroyGrid() {
+    if (state.grid) {
+      state.grid.destroy();
+      state.grid = null;
     }
-    return null;
   }
 
-  function allChosen() {
-    return state.askedKeys.every(function (k) { return state.guesses[k] != null; });
-  }
-
-  function makeNumButton(scanKey, n, dense) {
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'num-btn' + (dense ? ' dense' : '');
-    b.textContent = String(n);
-    b.setAttribute('data-testid', 'num-' + scanKey + '-' + n);
-    if (state.phase === 'answer') {
-      if (state.guesses[scanKey] === n) b.classList.add('selected');
-      b.addEventListener('click', function () { pickNumber(scanKey, n); });
-    } else {
-      var res = findResult(scanKey);
-      if (res && state.guesses[scanKey] === n) b.classList.add(res.ok ? 'ok' : 'bad');
-      b.disabled = true;
-    }
-    return b;
-  }
-
-  function makeScanCell(scanKey) {
-    var meta = KEY_META[scanKey];
-    var wrap = div('scan-cell');
-    wrap.setAttribute('data-testid', meta.testid);
-
-    var head = div('scan-cell-head');
-    if (meta.badge) head.appendChild(div('scan-badge', '级'));
-    head.appendChild(div('scan-cell-name', meta.name(state)));
-    head.appendChild(div('scan-cell-sub', '外剩'));
-    var res = findResult(scanKey);
-    if (res) {
-      var verdict = div('scan-verdict');
-      if (res.ok) {
-        wrap.classList.add('ok');
-        verdict.textContent = '✓ 正确';
-      } else {
-        wrap.classList.add('bad');
-        verdict.textContent = '✕ 应为 ' + res.truth;
-      }
-      head.appendChild(verdict);
-    }
-    wrap.appendChild(head);
-
-    var row = div('num-row');
-    var opts = L.numberOptions(optionsKey(scanKey));
-    var dense = opts.length > 4;
-    opts.forEach(function (n) {
-      row.appendChild(makeNumButton(scanKey, n, dense));
-    });
-    wrap.appendChild(row);
-    return wrap;
+  function truthSlot(slot) {
+    return state.outside[slot];
   }
 
   function renderAnswer(root, isFeedback) {
@@ -223,7 +160,7 @@
 
     if (!isFeedback) {
       panel.appendChild(div('scan-title', '外面还剩几？'));
-      panel.appendChild(div('scan-sub', '外剩 = 总张 − 你手里的 · 直接点数字'));
+      panel.appendChild(div('scan-sub', '外剩 = 总张 − 你手里的 · 点格子选中，用下方数字键'));
       panel.appendChild(div('scan-cover', '▢ 手牌已盖 · 闭卷'));
     } else {
       var wrongN = state.wrongKeys.length;
@@ -234,9 +171,28 @@
         ' · 小王 ' + (L.COPIES_PER_JOKER - state.outside.small)));
     }
 
-    state.askedKeys.forEach(function (k) {
-      panel.appendChild(makeScanCell(k));
+    var gridSlot = div('ans-grid-slot');
+    panel.appendChild(gridSlot);
+    state.grid = G.createAnswerGrid({
+      container: gridSlot,
+      levelRank: state.levelRank,
+      askedKeys: state.askedKeys,
+      label: '外剩',
+      onChange: function () { renderAnswerActions(panel, isFeedback); }
     });
+    if (isFeedback) {
+      if (state.gridGuesses) state.grid.setGuesses(state.gridGuesses);
+      var truth = { level: truthSlot('level'), big: truthSlot('big'), small: truthSlot('small') };
+      state.grid.showFeedback(truth);
+    }
+
+    renderAnswerActions(panel, isFeedback);
+    root.appendChild(panel);
+  }
+
+  function renderAnswerActions(panel, isFeedback) {
+    var old = panel.querySelector('.scan-actions');
+    if (old) panel.removeChild(old);
 
     var actions = div('scan-actions');
     if (!isFeedback) {
@@ -245,7 +201,7 @@
       checkBtn.className = 'btn btn-primary';
       checkBtn.setAttribute('data-testid', 'btn-check');
       checkBtn.textContent = '核对';
-      checkBtn.disabled = !allChosen();
+      checkBtn.disabled = !(state.grid && state.grid.allChosen());
       checkBtn.addEventListener('click', check);
       actions.appendChild(checkBtn);
     } else {
@@ -268,27 +224,22 @@
       }
     }
     panel.appendChild(actions);
-    root.appendChild(panel);
   }
 
   function render() {
     var root = els.root;
     if (!root) return;
+    destroyGrid();
     root.innerHTML = '';
     if (state.phase === 'flash') renderFlash(root);
     else if (state.phase === 'answer') renderAnswer(root, false);
     else if (state.phase === 'feedback') renderAnswer(root, true);
   }
 
-  function pickNumber(scanKey, n) {
-    if (state.phase !== 'answer') return;
-    state.guesses[scanKey] = n;
-    render();
-  }
-
   function check() {
-    if (state.phase !== 'answer' || !allChosen()) return;
-    state.results = L.checkScan(state.guesses, state.outside, state.askedKeys);
+    if (state.phase !== 'answer' || !state.grid || !state.grid.allChosen()) return;
+    state.gridGuesses = state.grid.getGuesses();
+    state.results = L.checkScan(state.gridGuesses, state.outside, state.askedKeys);
     state.wrongKeys = state.results
       .filter(function (r) { return !r.ok; })
       .map(function (r) { return r.key; });
@@ -305,10 +256,9 @@
     state.hand = deal.hand;
     state.outside = deal.outside;
     state.askedKeys = askedKeys.slice();
-    state.guesses = {};
-    state.askedKeys.forEach(function (k) { state.guesses[k] = undefined; });
     state.results = null;
     state.wrongKeys = [];
+    state.gridGuesses = null;
     state.phase = 'flash';
     render();
     startTimer();
@@ -316,6 +266,7 @@
 
   function goHome() {
     stopTimer();
+    destroyGrid();
     state.phase = 'off';
     render();
     document.getElementById('scan-back-slot').innerHTML = '';
@@ -331,7 +282,8 @@
   }
 
   window.__scanDebug = {
-    getOutside: function () { return state.outside; }
+    getOutside: function () { return state.outside; },
+    state: state
   };
 
   function init() {

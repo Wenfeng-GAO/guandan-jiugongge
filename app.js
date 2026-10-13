@@ -1,8 +1,9 @@
-/* 掼蛋九宫格记牌练习 - 出牌闭卷（v5：闭卷填剩余 + 三行渐进解锁，数字直选替代 +1 循环） */
-/* global GuandanLogic */
+/* 掼蛋九宫格记牌练习 - 出牌闭卷（v6：闭卷填剩余 + 三行渐进解锁，统一九宫格作答） */
+/* global GuandanLogic, GuandanGrid */
 (function () {
   'use strict';
   var L = GuandanLogic;
+  var G = GuandanGrid;
 
   // phase: idle | flipping | filling | done
   var state = {
@@ -12,8 +13,7 @@
     roundRows: 1, // 本盘锁定的行数（升档下一盘才生效）
     streak: 0,
     activeKeys: [],
-    guesses: {},
-    selectedKey: null, // filling 阶段选中的格子（下方数字键给它选剩余）
+    grid: null,
     deck: [],
     flipIndex: 0,
     lastWrong: [],
@@ -21,21 +21,6 @@
     justUnlocked: false
   };
   state.activeKeys = L.getUnlockedKeys(state.roundRows, state.levelRank);
-  state.guesses = L.createZeroGuesses(state.activeKeys);
-
-  // 固定 3×3 展示格：每格 { row, kind, key }
-  // 行1 col0 的 key 跟随级牌
-  var CELL_DEFS = [
-    { row: 1, kind: 'level' },
-    { row: 1, kind: 'fixed', key: L.BIG_JOKER },
-    { row: 1, kind: 'fixed', key: L.SMALL_JOKER },
-    { row: 2, kind: 'fixed', key: 'A' },
-    { row: 2, kind: 'fixed', key: 'K' },
-    { row: 2, kind: 'fixed', key: 'Q' },
-    { row: 3, kind: 'fixed', key: 'J' },
-    { row: 3, kind: 'fixed', key: '10' },
-    { row: 3, kind: 'fixed', key: '9' }
-  ];
 
   var $ = function (id) { return document.getElementById(id); };
   var els = {};
@@ -44,72 +29,40 @@
     [
       'level-select', 'streak-info', 'stat-remain', 'stat-result', 'row-label',
       'flip-panel', 'current-card', 'flip-count', 'flip-total', 'last-cards', 'phase-hint',
-      'map-grid', 'btn-primary', 'btn-secondary', 'message',
-      'num-picker', 'picker-key', 'picker-row', 'closed-back-slot'
+      'closed-grid-slot', 'btn-primary', 'btn-secondary', 'message', 'closed-back-slot'
     ].forEach(function (id) { els[id] = $(id); });
   }
 
-  function cellKey(def) {
-    return def.kind === 'level' ? state.levelRank : def.key;
+  // 九宫格点位 → 逻辑点数键：级格=当前级牌，王格=大小王，其余=本身
+  function keyOfSlot(slot) {
+    if (slot === 'level') return state.levelRank;
+    if (slot === 'big') return L.BIG_JOKER;
+    if (slot === 'small') return L.SMALL_JOKER;
+    return slot;
   }
 
-  function cellLabel(def) {
-    if (def.kind === 'level') return state.levelRank;
-    return def.key;
-  }
-
-  function isRowUnlocked(row) {
-    // 本盘内用 roundRows；升档后的新行下一盘才可填
-    return row <= state.roundRows;
-  }
-
-  function makeCell(def, index) {
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'cell';
-    btn.dataset.index = String(index);
-    btn.dataset.row = String(def.row);
-
-    var markRow = document.createElement('div');
-    markRow.className = 'mark-row';
-    var lv = document.createElement('span');
-    lv.className = 'lv';
-    lv.textContent = '级';
-    var mark = document.createElement('span');
-    mark.className = 'mark';
-    mark.textContent = '▢';
-    markRow.appendChild(lv);
-    markRow.appendChild(mark);
-
-    var rank = document.createElement('span');
-    rank.className = 'rank';
-    var count = document.createElement('span');
-    count.className = 'count';
-    var hint = document.createElement('span');
-    hint.className = 'hint';
-
-    btn.appendChild(markRow);
-    btn.appendChild(rank);
-    btn.appendChild(count);
-    btn.appendChild(hint);
-    btn.addEventListener('click', function () { onCellTap(index); });
-    return btn;
-  }
-
-  function buildGrid() {
-    els['map-grid'].innerHTML = '';
-    CELL_DEFS.forEach(function (def, i) {
-      els['map-grid'].appendChild(makeCell(def, i));
+  // 本盘被考的格（= 已解锁行）
+  function askedSlots() {
+    var rows = state.roundRows;
+    var slots = [];
+    G.CANON.forEach(function (slot) {
+      var row = slot === 'level' || slot === 'big' || slot === 'small' ? 1
+        : (slot === 'A' || slot === 'K' || slot === 'Q' ? 2 : 3);
+      if (row <= rows) slots.push(slot);
     });
+    return slots;
+  }
+
+  function destroyGrid() {
+    if (state.grid) {
+      state.grid.destroy();
+      state.grid = null;
+    }
   }
 
   function showMessage(text, type) {
     els.message.textContent = text || '';
     els.message.className = 'message' + (type ? ' ' + type : '');
-  }
-
-  function refreshActiveKeys() {
-    state.activeKeys = L.getUnlockedKeys(state.roundRows, state.levelRank);
   }
 
   function renderStats() {
@@ -191,99 +144,31 @@
     }
   }
 
-  function renderCells() {
-    var cells = els['map-grid'].querySelectorAll('.cell');
-    cells.forEach(function (cell, index) {
-      var def = CELL_DEFS[index];
-      var key = cellKey(def);
-      var unlocked = isRowUnlocked(def.row);
-      var rankEl = cell.querySelector('.rank');
-      var countEl = cell.querySelector('.count');
-      var hintEl = cell.querySelector('.hint');
-
-      cell.className = 'cell';
-      cell.setAttribute('data-testid', 'cell-closed-' + key);
-      if (def.kind === 'level') cell.classList.add('is-level');
-      rankEl.textContent = cellLabel(def);
-
-      // 灰行预览：始终锁定样式，点击无效
-      if (!unlocked) {
-        cell.classList.add('locked');
-        countEl.textContent = '—';
-        hintEl.textContent = (index === 3 || index === 6) ? '升档' : '';
-        return;
-      }
-
-      if (state.phase === 'idle' || state.phase === 'flipping') {
-        // 已解锁但尚未闭卷：显示待填，不可点改
-        countEl.textContent = '—';
-        hintEl.textContent = '待填';
-        return;
-      }
-
-      if (state.phase === 'filling') {
-        countEl.textContent = String(state.guesses[key] || 0);
-        if (key === state.selectedKey) {
-          cell.classList.add('picked');
-          hintEl.textContent = '已选';
-        } else {
-          hintEl.textContent = '点选';
-        }
-        return;
-      }
-
-      // done：大字显示真实剩余；绿正确 / 红错误
-      var truth = state.lastTruth ? state.lastTruth[key] : 0;
-      var user = state.guesses[key] || 0;
-      var ok = user === truth;
-      countEl.textContent = String(truth);
-      cell.classList.add('done');
-      if (ok) {
-        cell.classList.add('ok');
-        hintEl.textContent = '正确';
-      } else {
-        cell.classList.add('wrong');
-        var miss = truth - user;
-        if (miss > 0) {
-          hintEl.textContent = '漏' + miss + '·填' + user;
-        } else {
-          hintEl.textContent = '多' + (-miss) + '·填' + user;
-        }
-      }
-    });
-  }
-
-  // filling 阶段：选中格 → 下方共享数字键直接选剩余
-  function renderPicker() {
-    var picker = els['num-picker'];
-    if (state.phase !== 'filling' || !state.selectedKey) {
-      picker.classList.add('hidden');
+  // 作答/反馈阶段渲染统一九宫格；翻牌阶段不挂（被考点集随本盘行数变化）
+  function renderGrid() {
+    if (state.phase !== 'filling' && state.phase !== 'done') {
+      destroyGrid();
       return;
     }
-    picker.classList.remove('hidden');
-    var key = state.selectedKey;
-    els['picker-key'].textContent = key;
-    var row = els['picker-row'];
-    row.innerHTML = '';
-    var opts = L.numberOptions(key);
-    var dense = opts.length > 4;
-    opts.forEach(function (n) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'num-btn' + (dense ? ' dense' : '');
-      if (state.guesses[key] === n) b.classList.add('selected');
-      b.setAttribute('data-testid', 'pick-' + n);
-      b.textContent = String(n);
-      b.addEventListener('click', function () { onPickNumber(key, n); });
-      row.appendChild(b);
-    });
-  }
-
-  function onPickNumber(key, n) {
-    if (state.phase !== 'filling') return;
-    state.guesses[key] = n;
-    showMessage('');
-    render();
+    var slots = askedSlots();
+    if (!state.grid) {
+      state.grid = G.createAnswerGrid({
+        container: els['closed-grid-slot'],
+        levelRank: state.levelRank,
+        askedKeys: slots,
+        label: '剩余',
+        onChange: function () { showMessage(''); renderButtons(); }
+      });
+    } else {
+      state.grid.setAskedKeys(slots);
+    }
+    if (state.phase === 'done' && state.lastTruth) {
+      var truth = {};
+      slots.forEach(function (slot) { truth[slot] = state.lastTruth[keyOfSlot(slot)] || 0; });
+      state.grid.showFeedback(truth);
+    } else {
+      state.grid.clearFeedback();
+    }
   }
 
   function renderButtons() {
@@ -308,7 +193,7 @@
 
     if (state.phase === 'filling') {
       primary.textContent = '核对';
-      primary.disabled = false;
+      primary.disabled = !(state.grid && state.grid.allChosen());
       secondary.textContent = '再练一盘';
       secondary.disabled = false;
       return;
@@ -335,27 +220,16 @@
       ' · 第' + state.unlockedRows + '行';
     renderStats();
     renderFlip();
-    renderCells();
-    renderPicker();
+    renderGrid();
     renderButtons();
   }
 
-  function onCellTap(index) {
-    if (state.phase !== 'filling') return;
-    var def = CELL_DEFS[index];
-    if (!isRowUnlocked(def.row)) return;
-    state.selectedKey = cellKey(def);
-    showMessage('');
-    render();
-  }
-
   function newRound() {
+    destroyGrid();
     state.roundRows = state.unlockedRows;
-    refreshActiveKeys();
+    state.activeKeys = L.getUnlockedKeys(state.roundRows, state.levelRank);
     state.deck = L.shuffle(L.createDeckForKeys(state.activeKeys));
     state.flipIndex = 0;
-    state.guesses = L.createZeroGuesses(state.activeKeys);
-    state.selectedKey = null;
     state.lastWrong = [];
     state.lastTruth = null;
     state.justUnlocked = false;
@@ -385,21 +259,24 @@
       showMessage('请先翻开至少一张再闭卷', 'warn');
       return;
     }
-    state.guesses = L.createZeroGuesses(state.activeKeys);
-    state.selectedKey = null;
     state.phase = 'filling';
     showMessage('牌面已收。点格子选中，用下方数字键直接选剩余，满意后点「核对」。', 'info');
     render();
   }
 
   function check() {
-    if (state.phase !== 'filling') return;
+    if (state.phase !== 'filling' || !state.grid || !state.grid.allChosen()) return;
     var played = state.deck.slice(0, state.flipIndex);
-    var wrong = L.checkAnswer(state.guesses, played, state.activeKeys);
+    var guesses = {};
+    state.activeKeys.forEach(function (k) { guesses[k] = 0; });
+    var slotGuesses = state.grid.getGuesses();
+    Object.keys(slotGuesses).forEach(function (slot) {
+      guesses[keyOfSlot(slot)] = slotGuesses[slot];
+    });
+    var wrong = L.checkAnswer(guesses, played, state.activeKeys);
     var truth = L.trueRemaining(played);
     state.lastWrong = wrong;
     state.lastTruth = truth;
-    state.selectedKey = null;
     state.phase = 'done';
 
     var allCorrect = wrong.length === 0;
@@ -407,7 +284,7 @@
     state.unlockedRows = prog.unlockedRows;
     state.streak = prog.streak;
     state.justUnlocked = prog.justUnlocked;
-    // 不在本盘刷新 activeKeys / roundRows：新行下一盘才进地图计分
+    // 不在本盘刷新 roundRows：新行下一盘才进作答计分
 
     if (allCorrect) {
       var msg = '全部正确！';
@@ -452,13 +329,12 @@
 
   function changeLevel(rank) {
     if (rank === state.levelRank) return;
+    destroyGrid();
     state.levelRank = rank;
     state.roundRows = state.unlockedRows;
-    refreshActiveKeys();
+    state.activeKeys = L.getUnlockedKeys(state.roundRows, state.levelRank);
     state.deck = [];
     state.flipIndex = 0;
-    state.guesses = L.createZeroGuesses(state.activeKeys);
-    state.selectedKey = null;
     state.lastWrong = [];
     state.lastTruth = null;
     state.phase = 'idle';
@@ -485,7 +361,12 @@
   }
 
   function goHome() {
+    destroyGrid();
     els['closed-back-slot'].innerHTML = '';
+    state.phase = 'idle';
+    state.deck = [];
+    state.flipIndex = 0;
+    render();
     window.GuandanNav.show('home');
   }
 
@@ -502,7 +383,6 @@
 
   function init() {
     grabElements();
-    buildGrid();
     L.RANKS.forEach(function (r) {
       var opt = document.createElement('option');
       opt.value = r;
