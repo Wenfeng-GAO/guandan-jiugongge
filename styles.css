@@ -495,7 +495,7 @@ body {
   padding: 20px 16px;
 }
 .scan-title { font-size: 16px; font-weight: 600; line-height: 20px; color: var(--text); }
-.scan-sub { font-size: 13px; line-height: 16px; color: var(--mute); margin-top: 4px; }
+.scan-sub { font-size: 13px; line-height: 16px; color: var(--mute); margin-top: 4px; margin-bottom: 12px; line-height: 18px; }
 .scan-timer {
   display: flex;
   align-items: center;
