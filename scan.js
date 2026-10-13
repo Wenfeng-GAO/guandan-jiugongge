@@ -24,10 +24,13 @@
 
   var els = {};
 
+  // —— v7 整场会话钩子（session.js 提供；防御式调用） ——
+  function S() { return window.GuandanSession || null; }
+
   // —— 视图切换（grid.js → scan.js → app.js / sim.js 共用；scan.js 先于 app.js 加载） ——
   window.GuandanNav = {
     show: function (name) {
-      ['home', 'scan', 'closed', 'sim'].forEach(function (v) {
+      ['home', 'scan', 'closed', 'sim', 'summary'].forEach(function (v) {
         var node = document.getElementById('view-' + v);
         if (node) node.classList.toggle('hidden', v !== name);
       });
@@ -77,6 +80,8 @@
     if (remain <= 0) {
       stopTimer();
       state.phase = 'answer';
+      var s0 = S();
+      if (s0) s0.setAnswering(true);
       render();
       return;
     }
@@ -244,7 +249,28 @@
       .filter(function (r) { return !r.ok; })
       .map(function (r) { return r.key; });
     state.phase = 'feedback';
+    var s = S();
+    if (s) {
+      s.setAnswering(false);
+      s.roundFinished('scan', state.wrongKeys.length === 0);
+    }
     render();
+  }
+
+  // v7：闪牌期间暂停 → 停表；恢复 → 重新完整闪 8 秒
+  function restartFlash() {
+    if (state.phase !== 'flash') return;
+    state.deadline = Date.now() + FLASH_MS;
+    render();
+    startTimer();
+  }
+
+  function onSessionPause() {
+    if (state.phase === 'flash') stopTimer();
+  }
+
+  function onSessionResume() {
+    restartFlash();
   }
 
   function startRound(askedKeys) {
@@ -260,6 +286,11 @@
     state.wrongKeys = [];
     state.gridGuesses = null;
     state.phase = 'flash';
+    var s = S();
+    if (s) {
+      s.setAnswering(false);
+      s.roundStarted('scan');
+    }
     render();
     startTimer();
   }
@@ -290,6 +321,11 @@
     els.root = document.getElementById('scan-root');
     var entry = document.querySelector('[data-testid="entry-scan"]');
     if (entry) entry.addEventListener('click', enterScan);
+    var s = S();
+    if (s) {
+      s.onPause(onSessionPause);
+      s.onResume(onSessionResume);
+    }
     render();
   }
 

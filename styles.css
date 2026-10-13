@@ -653,3 +653,102 @@ body {
   .mode-grid { gap: 6px; }
   .mode-card { padding: 12px; }
 }
+
+/* ===== v7：整场计时器（顶栏小组件 + 细进度线 + 暂停盖屏 + 小结） ===== */
+
+/* 顶栏右侧：13px 分秒 + 边框暂停钮（作答时 .dim 淡到 35%，暂停时 .pause 变灰） */
+.mode-topbar .tm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.mode-topbar .tm.dim { opacity: 0.35; }
+.mode-topbar .tm.pause { color: var(--mute); }
+.tm-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--mute);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tm-btn:active:not(:disabled) { transform: scale(0.95); }
+.tm-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* 顶栏下方 2px 细进度线：整场已用，#8B93A1 on #1C222B */
+.tm-line {
+  height: 2px;
+  margin: -8px 0 12px;
+  background: var(--cell);
+  overflow: hidden;
+}
+.tm-line.dim { opacity: 0.35; }
+.tm-line i {
+  display: block;
+  height: 2px;
+  width: 0;
+  background: var(--mute);
+}
+
+/* 暂停盖屏：不透明底，盖住当前这盘防偷看 */
+.pause-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.pause-cover-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.pause-cover .btn { width: 200px; }
+
+/* 小结：一屏，不滚动 */
+#view-summary { min-height: calc(100vh - 48px); display: flex; flex-direction: column; }
+.sum-head { padding: 8px 0 4px; }
+.sum-title { font-size: 22px; font-weight: 700; line-height: 1.3; }
+.sum-hero { margin: 28px 0 24px; }
+.sum-big {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.sum-sub { font-size: 13px; color: var(--mute); margin-top: 4px; }
+.sum-rows {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 16px;
+}
+.sum-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sum-row:last-child { border-bottom: 0; }
+.sum-row-sug { margin-left: 6px; font-size: 11px; font-weight: 500; color: var(--mute); }
+.sum-row-val { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sum-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+}
