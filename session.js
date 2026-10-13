@@ -8,7 +8,6 @@
   'use strict';
 
   var DEFAULT_DURATION_MS = 15 * 60 * 1000;
-  var SUMMARY_DELAY_MS = 1200; // 核对完先让用户看一眼反馈再进小结
 
   function queryDurationMs() {
     try {
@@ -24,6 +23,7 @@
   var answering = false;   // 闭卷作答阶段：组件淡化到 35% 但照走
   var pauseFns = [];
   var resumeFns = [];
+  var summaryReadyFns = []; // v7.1：时间到 + 最后一盘核对完 → 通知关卡换「看小结」按钮
   var widgets = [];        // 每个关卡顶栏一份小组件
   var tickId = null;
   var els = {};
@@ -56,8 +56,10 @@
       w.line.classList.toggle('dim', dim);
       w.fill.style.width = (s.progress * 100) + '%';
     });
-    if (els.cover) els.cover.classList.toggle('hidden', !paused);
-    if (els.cover && paused) {
+    // v7.1：只有关卡视图（扫牌/闭卷/实战顶栏）可见时才盖屏；首页/小结不盖
+    var levelVisible = !!document.querySelector('.view:not(.hidden) .mode-topbar');
+    if (els.cover) els.cover.classList.toggle('hidden', !(paused && levelVisible));
+    if (els.cover && paused && levelVisible) {
       // 只盖当前这盘：顶栏（灰数字 + ▶）和进度线留在外面
       var bar = null;
       document.querySelectorAll('.view:not(.hidden) .mode-topbar').forEach(function (b) { bar = b; });
@@ -71,7 +73,7 @@
     t.on('change', updateWidget);
     t.on('pause', function () { dispatch(pauseFns); updateWidget(); });
     t.on('resume', function () { dispatch(resumeFns); updateWidget(); });
-    t.on('summary', function () { setTimeout(showSummary, SUMMARY_DELAY_MS); });
+    t.on('summary', function () { dispatch(summaryReadyFns); updateWidget(); });
   }
 
   function startTicker() {
@@ -156,7 +158,11 @@
     roundFinished: function (id, allCorrect) { timer.roundFinished(id, allCorrect); },
     setAnswering: function (b) { answering = !!b; updateWidget(); },
     onPause: function (fn) { if (typeof fn === 'function') pauseFns.push(fn); },
-    onResume: function (fn) { if (typeof fn === 'function') resumeFns.push(fn); }
+    onResume: function (fn) { if (typeof fn === 'function') resumeFns.push(fn); },
+    // v7.1：时间到且最后一盘已核对 → 小结就绪；反馈保留，点「看小结」才进小结
+    isSummaryReady: function () { return timer.getState().status === 'summary'; },
+    onSummaryReady: function (fn) { if (typeof fn === 'function') summaryReadyFns.push(fn); },
+    showSummary: showSummary
   };
   Object.defineProperty(window.GuandanSession, 'timer', {
     get: function () { return timer; }

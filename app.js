@@ -200,6 +200,14 @@
     }
 
     // done
+    var s = window.GuandanSession;
+    if (s && s.isSummaryReady()) {
+      // v7.1：小结就绪 → 「再练一盘」成空操作，主按钮换成「看小结」
+      primary.textContent = '看小结';
+      primary.disabled = false;
+      secondary.disabled = true;
+      return;
+    }
     primary.textContent = '再练一盘';
     primary.disabled = false;
     if (state.justUnlocked) {
@@ -325,7 +333,12 @@
       check();
       return;
     }
-    // done → 再练一盘
+    // done → 看小结 / 再练一盘
+    var s = window.GuandanSession;
+    if (s && s.isSummaryReady()) {
+      s.showSummary();
+      return;
+    }
     newRound();
   }
 
@@ -407,6 +420,8 @@
     els['btn-secondary'].addEventListener('click', onSecondary);
     var entry = document.querySelector('[data-testid="entry-closed"]');
     if (entry) entry.addEventListener('click', enterClosed);
+    var s = window.GuandanSession;
+    if (s) s.onSummaryReady(function () { if (state.phase === 'done') render(); });
     render();
   }
 

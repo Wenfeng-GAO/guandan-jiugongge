@@ -1,4 +1,5 @@
 /* v7 smoke: console errors + 计时器/暂停/时间到/小结/翻牌暂停恢复 */
+/* v7.1: 时间到核对后不自动跳小结（反馈保留 + 「看小结」按钮）；暂停返回首页保持暂停 */
 const { chromium } = require('/workspace/pw/node_modules/playwright');
 
 const S = '/workspace/guandan-jiugongge/artifacts/v7/';
@@ -67,16 +68,20 @@ function ok(cond, name) {
     ok((await page.locator('#view-scan [data-testid="timer-label"]').innerText()) === '时间到 · 打完这盘', 'A13 时间到文案，不打断');
     ok(await page.locator('#view-scan [data-testid="timer-btn"]').isDisabled(), 'A14 时间到后暂停钮不可用');
 
-    // 答对 → 反馈 → 1.2s 后自动进小结（走真实点击：点格 → 数字键）
+    // 答对 → 反馈保留 → 小结不自动弹出，底部「看小结」点了才进（走真实点击：点格 → 数字键）
     const outside = await page.evaluate(() => window.__scanDebug.getOutside());
     for (const slot of ['level', 'big', 'small']) {
       await page.click('#view-scan [data-testid="grid-cell-' + slot + '"]');
       await page.click('#view-scan .ans-picker .num-btn:text-is("' + outside[slot] + '")');
     }
     await page.click('[data-testid="btn-check"]');
-    await page.waitForSelector('[data-testid="btn-next"]', { timeout: 3000 });
-    ok(true, 'A15 核对后先看到反馈（下一盘按钮）');
+    await page.waitForSelector('[data-testid="btn-view-summary"]', { timeout: 3000 });
+    ok(await page.locator('#view-scan').isVisible(), 'A15 核对后反馈保留（扫牌关仍可见）');
+    ok(!(await page.locator('#view-summary').isVisible()), 'A15b 小结未自动弹出');
+    await page.screenshot({ path: S + '06-view-summary-btn.png' });
+    await page.click('[data-testid="btn-view-summary"]');
     await page.waitForSelector('#view-summary:not(.hidden)', { timeout: 5000 });
+    ok(await page.locator('#view-summary').isVisible(), 'A15c 点「看小结」后进入小结');
     ok((await page.locator('[data-testid="summary-total"]').innerText()) === '1 盘', 'A16 小结总盘数 1 盘');
     ok((await page.locator('[data-testid="summary-correct"]').innerText()) === '全对 1 盘', 'A17 小结全对 1 盘');
     ok((await page.locator('[data-testid="summary-row-scan"] .sum-row-val').innerText()) === '1 盘 · 对 1', 'A18 扫牌行 1 盘 · 对 1');
@@ -164,6 +169,49 @@ function ok(cond, name) {
     ok(h1 === await page.locator('#view-closed [data-testid="timer-label"]').innerText(), 'B12 后台期间计时不走 ' + h1);
 
     ok(errors.length === 0, 'B9 无 console 错误 ' + JSON.stringify(errors));
+    await page.close();
+  }
+
+  // ============ Flow C: 暂停 → 返回首页保持暂停 → 再进关盖屏重现 → ▶ 继续 ============
+  {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const errors = [];
+    page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+    page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+
+    await page.goto(BASE + '?t=120');
+    await page.click('[data-testid="entry-scan"]');
+    await page.waitForSelector('[data-testid="scan-countdown"]');
+    await page.waitForTimeout(300);
+
+    // 暂停 → 返回首页：不重置、保持暂停，首页不盖屏
+    await page.click('#view-scan [data-testid="timer-btn"]');
+    await page.waitForTimeout(150);
+    ok(await page.locator('[data-testid="pause-cover"]').isVisible(), 'C0 暂停盖屏出现');
+    await page.click('#view-scan [data-testid="btn-back"]');
+    await page.waitForTimeout(400); // 等 tick 刷新盖屏可见性
+    ok(await page.locator('#view-home').isVisible(), 'C1 暂停时可点返回，回到首页');
+    ok(!(await page.locator('[data-testid="pause-cover"]').isVisible()), 'C2 首页不显示暂停盖屏');
+    ok(await page.evaluate(() => window.GuandanSession.timer.getState().status === 'paused'), 'C3 回首页后计时器仍 paused');
+    const rem1 = await page.evaluate(() => window.GuandanSession.timer.getState().remainingMs);
+    await page.waitForTimeout(1200);
+    const rem2 = await page.evaluate(() => window.GuandanSession.timer.getState().remainingMs);
+    ok(Math.abs(rem1 - rem2) < 50, 'C4 首页停留期间剩余时间不走 (' + rem1 + '→' + rem2 + ')');
+
+    // 再进任意关：盖屏重现，▶ 从同一时间继续
+    await page.click('[data-testid="entry-closed"]');
+    await page.waitForTimeout(400); // 等 tick 刷新盖屏可见性
+    ok(await page.locator('[data-testid="pause-cover"]').isVisible(), 'C5 再进关卡盖屏重现');
+    ok(await page.evaluate(() => window.GuandanSession.timer.getState().status === 'paused'), 'C6 再进关卡仍 paused');
+    await page.click('[data-testid="pause-resume"]');
+    await page.waitForTimeout(150);
+    ok(await page.evaluate(() => window.GuandanSession.timer.getState().status === 'running'), 'C7 ▶ 后恢复 running');
+    const rem3 = await page.evaluate(() => window.GuandanSession.timer.getState().remainingMs);
+    await page.waitForTimeout(1200);
+    const rem4 = await page.evaluate(() => window.GuandanSession.timer.getState().remainingMs);
+    ok(rem3 - rem4 > 800, 'C8 恢复后时间继续走 (' + rem3 + '→' + rem4 + ')');
+
+    ok(errors.length === 0, 'C9 无 console 错误 ' + JSON.stringify(errors));
     await page.close();
   }
 
