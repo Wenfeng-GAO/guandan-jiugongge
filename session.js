@@ -57,6 +57,14 @@
       w.fill.style.width = (s.progress * 100) + '%';
     });
     if (els.cover) els.cover.classList.toggle('hidden', !paused);
+    if (els.cover && paused) {
+      // 只盖当前这盘：顶栏（灰数字 + ▶）和进度线留在外面
+      var bar = null;
+      document.querySelectorAll('.view:not(.hidden) .mode-topbar').forEach(function (b) { bar = b; });
+      var line = bar && bar.parentNode.querySelector('[data-testid="timer-line"]');
+      var edge = line || bar;
+      els.cover.style.top = edge ? Math.ceil(edge.getBoundingClientRect().bottom + 4) + 'px' : '0px';
+    }
   }
 
   function wire(t) {

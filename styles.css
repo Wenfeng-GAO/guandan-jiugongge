@@ -701,7 +701,7 @@ body {
 /* 暂停盖屏：不透明底，盖住当前这盘防偷看 */
 .pause-cover {
   position: fixed;
-  inset: 0;
+  left: 0; right: 0; bottom: 0; top: 0;
   z-index: 100;
   background: var(--bg);
   display: flex;
