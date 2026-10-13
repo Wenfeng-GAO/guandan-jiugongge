@@ -2,6 +2,6 @@
   "name": "guandan-jiugongge",
   "private": true,
   "scripts": {
-    "test": "node check.js && node test/scan.test.js"
+    "test": "node check.js && node test/scan.test.js && node test/sim.test.js"
   }
 }

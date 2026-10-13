@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0d10">
-  <meta name="description" content="掼蛋九宫格记牌练习：开局扫牌 8 秒报外剩、出牌闭卷填剩余、三行渐进解锁">
+  <meta name="description" content="掼蛋九宫格记牌练习：开局扫牌 8 秒报外剩、出牌闭卷填剩余、实战模拟随机停闭卷作答、三行渐进解锁">
   <title>掼蛋九宫格记牌练习</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -12,18 +12,20 @@
   <!-- 首页：选一关练 -->
   <section id="view-home" class="view">
     <header class="site-header">
-      <p class="eyebrow">品味稿 v5 · 开局扫牌 × 出牌闭卷</p>
+      <p class="eyebrow">品味稿 v6 · 开局扫牌 × 出牌闭卷 × 实战模拟</p>
       <h1>掼蛋九宫格</h1>
-      <p class="subtitle">开局扫牌 · 8 秒报外剩 ｜ 出牌闭卷 · 翻牌记填剩余</p>
+      <p class="subtitle">开局扫牌 · 8 秒报外剩 ｜ 出牌闭卷 · 翻牌记填剩余 ｜ 实战模拟 · 随机停闭卷作答</p>
     </header>
 
     <details class="howto">
       <summary>怎么玩</summary>
       <div class="howto-body">
-        <p><strong>开局扫牌：</strong>进关自动发 27 张手牌，按点数排好、级牌（含 ♥级 逢人配）描金框，只亮 8 秒，到点自动盖牌、不能回看。凭记忆填 级 / 大王 / 小王 的外剩（外面还剩几），直接点数字，点「核对」。</p>
+        <p><strong>开局扫牌：</strong>进关自动发 27 张手牌，按点数排好、级牌（含 ♥级 逢人配）描金框，只亮 8 秒，到点自动盖牌、不能回看。凭记忆填 级 / 大王 / 小王 的外剩（外面还剩几），点格子选中、下方数字键直选，点「核对」。</p>
         <p><strong>扫牌反馈：</strong>每格绿 ✓ / 红 ✕ 并显示正确值。有错可「只重练错的格」（换新牌只考错格），全对进「下一盘」。不计分、不挂升档。</p>
         <p><strong>出牌闭卷：</strong>点「新开一盘」洗牌，「翻开下一张」逐张记牌（不要边看边减）。「闭卷填剩余」后点格子选中，用下方数字键直接选剩余，再点「核对」。</p>
-        <p><strong>三行升档（出牌闭卷）：</strong>默认只练第 1 行（级 / 大王 / 小王）。连对 3 盘解锁第 2 行（A/K/Q），再连对 3 盘解锁第 3 行（J/10/9）。灰行预览不可点、不计分。「级」跟随当前级牌，两关共用上方设置。</p>
+        <p><strong>三行升档（出牌闭卷）：</strong>默认只练第 1 行（级 / 大王 / 小王）。连对 3 盘解锁第 2 行（A/K/Q），再连对 3 盘解锁第 3 行（J/10/9）。灰行预览不可点、不计分。「级」跟随当前级牌，三关共用上方设置。</p>
+        <p><strong>实战模拟：</strong>8 秒闪手牌后盖住，其余牌由游戏自动逐张翻（每张 1.5 秒，只显示这一张的细进度条）。翻过 N 张（随机 10–30）喊停，按「外剩 = 总张 − 手牌 − 翻过的」闭卷作答。反馈分三段：开局外剩 → 翻牌减 → 最终。连对 3 盘 → N 放大到 20–50。</p>
+        <p><strong>作答九宫格（三关通用）：</strong>第 1 行 级/大王/小王，第 2 行 A/K/Q，第 3 行 J/10/9。未开放的格原位灰显不可点；点被考的格，九宫格下方弹出数字键（级/A–9 选 0–8，王选 0–2）。</p>
       </div>
     </details>
 
@@ -31,16 +33,16 @@
       <div class="setting-row">
         <label class="setting-label" for="level-select">级牌</label>
         <select id="level-select" class="level-select" aria-label="选择当前级牌"></select>
-        <span class="streak-info">两关通用</span>
+        <span class="streak-info">三关通用</span>
       </div>
     </section>
 
     <div class="entry-head">
       <p class="entry-eyebrow">入口</p>
       <h2 class="entry-title">选一关练</h2>
-      <p class="entry-sub">两关并排，各练一件事</p>
+      <p class="entry-sub">三关并排，各练一件事</p>
     </div>
-    <div class="mode-grid">
+    <div class="mode-grid mode-grid-3">
       <button type="button" class="mode-card" data-testid="entry-scan">
         <span class="mode-name">开局扫牌</span>
         <span class="mode-desc">闪手牌 8 秒 → 盖牌 → 填外剩</span>
@@ -50,6 +52,11 @@
         <span class="mode-name">出牌闭卷</span>
         <span class="mode-desc">翻牌记 → 闭卷 → 填最终剩余</span>
         <span class="mode-tag">档位 · 级牌&amp;王</span>
+      </button>
+      <button type="button" class="mode-card" data-testid="entry-sim">
+        <span class="mode-name">实战模拟</span>
+        <span class="mode-desc">闪手牌 → 自动翻牌 → 随机停 → 闭卷</span>
+        <span class="mode-tag">N 10–30 · 连对升 20–50</span>
       </button>
     </div>
 
@@ -96,11 +103,7 @@
     </section>
 
     <main class="grid-wrap">
-      <div id="map-grid" class="map-grid" aria-label="三行点数地图"></div>
-      <div id="num-picker" class="num-picker hidden">
-        <p class="num-picker-label">为 <b id="picker-key"></b> 选剩余</p>
-        <div id="picker-row" class="num-row"></div>
-      </div>
+      <div id="closed-grid-slot"></div>
     </main>
 
     <section id="controls" class="controls">
@@ -111,8 +114,20 @@
     <div id="message" class="message" aria-live="polite"></div>
   </section>
 
+  <!-- 实战模拟 -->
+  <section id="view-sim" class="view hidden">
+    <div class="mode-topbar">
+      <div id="sim-back-slot"></div>
+      <span class="mode-name-sm">实战模拟</span>
+      <span id="sim-streak-info" class="streak-info" aria-live="polite"></span>
+    </div>
+    <div id="sim-root"></div>
+  </section>
+
   <script src="logic.js"></script>
+  <script src="grid.js"></script>
   <script src="scan.js"></script>
   <script src="app.js"></script>
+  <script src="sim.js"></script>
 </body>
 </html>

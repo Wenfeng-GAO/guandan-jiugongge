@@ -1,6 +1,7 @@
 /* 掼蛋九宫格记牌练习 - 纯逻辑层（浏览器与 Node 共用）
  * v4：闭卷填剩余 + 三行渐进解锁（级/王 → A/K/Q → J/10/9）
  * v5：开局扫牌 — 花色牌堆 / 逢人配随级 / 外剩三格
+ * v6：实战模拟 — 27 张手牌 + 其余牌翻 N 张 / 连对 3 盘放大 N
  */
 (function (global, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -27,6 +28,10 @@
   var DEFAULT_LEVEL_RANK = '2';
   var UNLOCK_STREAK_NEED = 3;
   var MAX_UNLOCKED_ROWS = 3;
+
+  var SIM_N_BASE = [10, 30];
+  var SIM_N_UP = [20, 50];
+  var SIM_FLIP_MS = 1500;
 
   function getRowKeys(rowIndex, levelRank) {
     levelRank = levelRank || DEFAULT_LEVEL_RANK;
@@ -145,19 +150,24 @@
     return shuffle(createSuitedDeck(), rng).slice(0, n);
   }
 
-  function outsideCounts(hand, levelRank) {
+  function bucketCounts(cards, levelRank) {
     var nLevel = 0;
     var nBig = 0;
     var nSmall = 0;
-    hand.forEach(function (c) {
+    cards.forEach(function (c) {
       if (c.rank === levelRank) nLevel += 1;
       else if (c.rank === BIG_JOKER) nBig += 1;
       else if (c.rank === SMALL_JOKER) nSmall += 1;
     });
+    return { level: nLevel, big: nBig, small: nSmall };
+  }
+
+  function outsideCounts(hand, levelRank) {
+    var n = bucketCounts(hand, levelRank);
     return {
-      level: COPIES_PER_RANK - nLevel,
-      big: COPIES_PER_JOKER - nBig,
-      small: COPIES_PER_JOKER - nSmall
+      level: COPIES_PER_RANK - n.level,
+      big: COPIES_PER_JOKER - n.big,
+      small: COPIES_PER_JOKER - n.small
     };
   }
 
@@ -180,6 +190,99 @@
       hand: sortHand(hand, levelRank),
       outside: outside,
       redeals: redeals
+    };
+  }
+
+  function normalizeSimRange(nRange) {
+    if (!nRange || nRange.length < 2) return [SIM_N_BASE[0], SIM_N_BASE[1]];
+    var min = nRange[0] | 0;
+    var max = nRange[1] | 0;
+    if (max < min) return [max, min];
+    return [min, max];
+  }
+
+  function randomIntInclusive(min, max, rng) {
+    var span = max - min + 1;
+    var r = rng();
+    if (!(r >= 0)) r = 0;
+    var n = min + Math.floor(r * span);
+    if (n > max) n = max;
+    if (n < min) n = min;
+    return n;
+  }
+
+  // 档位下标：0 基础 [10,30]，≥1 已升档 [20,50]。
+  // 对象则看 upgraded（升档后 streak 可归零，不能用连对数判断区间）。
+  function simNRange(streakOrIndex) {
+    var upgraded = false;
+    if (typeof streakOrIndex === 'boolean') {
+      upgraded = streakOrIndex;
+    } else if (streakOrIndex && typeof streakOrIndex === 'object') {
+      upgraded = !!streakOrIndex.upgraded;
+    } else {
+      upgraded = (streakOrIndex | 0) >= 1;
+    }
+    var src = upgraded ? SIM_N_UP : SIM_N_BASE;
+    return [src[0], src[1]];
+  }
+
+  function simStreakState(streak, upgraded, justUpgraded) {
+    return {
+      streak: streak,
+      upgraded: upgraded,
+      nRange: simNRange(upgraded ? 1 : 0),
+      justUpgraded: justUpgraded
+    };
+  }
+
+  // state: {streak, upgraded}。连对满 3 升档并保持；答错只把 streak 清零。
+  // 也接受纯数字 streak（尚未升档）。
+  function applySimStreak(state, allCorrect) {
+    var streak = 0;
+    var upgraded = false;
+    if (typeof state === 'number') {
+      streak = state | 0;
+    } else if (state && typeof state === 'object') {
+      streak = state.streak | 0;
+      upgraded = !!state.upgraded;
+    }
+    if (streak < 0) streak = 0;
+    if (!allCorrect) return simStreakState(0, upgraded, false);
+    var next = streak + 1;
+    if (!upgraded && next >= UNLOCK_STREAK_NEED) {
+      return simStreakState(next, true, true);
+    }
+    return simStreakState(next, upgraded, false);
+  }
+
+  function dealSimRound(levelRank, rng, nRange) {
+    levelRank = levelRank || DEFAULT_LEVEL_RANK;
+    rng = rng || Math.random;
+    var range = normalizeSimRange(nRange);
+    var deck;
+    var hand;
+    var outside;
+    do {
+      deck = shuffle(createSuitedDeck(), rng);
+      hand = deck.slice(0, DEFAULT_HAND_SIZE);
+      outside = outsideCounts(hand, levelRank);
+    } while (shouldRedeal(outside));
+    var remaining = deck.slice(DEFAULT_HAND_SIZE);
+    var n = randomIntInclusive(range[0], range[1], rng);
+    if (n > remaining.length) n = remaining.length;
+    var flips = remaining.slice(0, n);
+    var flipDelta = bucketCounts(flips, levelRank);
+    return {
+      hand: sortHand(hand, levelRank),
+      handOutside: outside,
+      flips: flips,
+      n: n,
+      finalOutside: {
+        level: outside.level - flipDelta.level,
+        big: outside.big - flipDelta.big,
+        small: outside.small - flipDelta.small
+      },
+      flipDelta: flipDelta
     };
   }
 
@@ -347,6 +450,9 @@
     DEFAULT_LEVEL_RANK: DEFAULT_LEVEL_RANK,
     UNLOCK_STREAK_NEED: UNLOCK_STREAK_NEED,
     MAX_UNLOCKED_ROWS: MAX_UNLOCKED_ROWS,
+    SIM_N_BASE: SIM_N_BASE,
+    SIM_N_UP: SIM_N_UP,
+    SIM_FLIP_MS: SIM_FLIP_MS,
     SCOPES: SCOPES,
     DEFAULT_SCOPE: DEFAULT_SCOPE,
     getRowKeys: getRowKeys,
@@ -381,6 +487,9 @@
     outsideCounts: outsideCounts,
     shouldRedeal: shouldRedeal,
     dealScanHand: dealScanHand,
+    dealSimRound: dealSimRound,
+    simNRange: simNRange,
+    applySimStreak: applySimStreak,
     sortHand: sortHand,
     numberOptions: numberOptions,
     checkScan: checkScan
