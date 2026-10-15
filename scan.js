@@ -26,6 +26,10 @@
 
   // —— v7 整场会话钩子（session.js 提供；防御式调用） ——
   function S() { return window.GuandanSession || null; }
+  function sessionPaused() {
+    var s = S();
+    return !!(s && typeof s.isPaused === 'function' && s.isPaused());
+  }
 
   // —— 视图切换（grid.js → scan.js → app.js / sim.js 共用；scan.js 先于 app.js 加载） ——
   window.GuandanNav = {
@@ -70,6 +74,9 @@
   }
 
   function startTimer() {
+    stopTimer();
+    // v7.2：整场已暂停（暂停后回首页再进关 / 切后台）→ 不起表，等 ▶ 继续再完整闪 8 秒
+    if (sessionPaused()) return;
     state.deadline = Date.now() + FLASH_MS;
     state.timerId = setInterval(tick, 100);
     tick();

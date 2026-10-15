@@ -48,6 +48,7 @@ python3 -m http.server 8000
 
 ```bash
 npm test   # node check.js && node test/scan.test.js && node test/sim.test.js
+npm run test:e2e:pause   # v7.2 回归：暂停后回首页再进关不偷跑（需本机 playwright；PW=模块路径可覆盖）
 ```
 
 ## 文件结构
@@ -61,6 +62,7 @@ npm test   # node check.js && node test/scan.test.js && node test/sim.test.js
 - `logic.js` — 纯逻辑（浏览器与 Node 共用）：`dealScanHand` / `dealSimRound` / `applySimStreak` / `SIM_FLIP_MS` / `numberOptions` / `isWild` 等
 - `check.js` — Node 自检：`node check.js`
 - `test/scan.test.js` / `test/sim.test.js` — 开局扫牌 / 实战模拟逻辑测试
+- `test/e2e/v7_2-pause-enter.playwright.js` — 暂停/切后台后进关的盖屏不偷跑回归（Playwright 假时钟）
 
 ## 如何部署
 

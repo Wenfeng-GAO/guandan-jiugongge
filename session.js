@@ -157,6 +157,8 @@
     roundStarted: function (id) { timer.roundStarted(id); },
     roundFinished: function (id, allCorrect) { timer.roundFinished(id, allCorrect); },
     setAnswering: function (b) { answering = !!b; updateWidget(); },
+    // v7.2：关卡开盘/起表前查询——已暂停（含回首页保持暂停、切后台）时不得起闪牌/翻牌计时
+    isPaused: function () { return timer.isPaused(); },
     onPause: function (fn) { if (typeof fn === 'function') pauseFns.push(fn); },
     onResume: function (fn) { if (typeof fn === 'function') resumeFns.push(fn); },
     // v7.1：时间到且最后一盘已核对 → 小结就绪；反馈保留，点「看小结」才进小结
