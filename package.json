@@ -2,6 +2,7 @@
   "name": "guandan-jiugongge",
   "private": true,
   "scripts": {
-    "test": "node check.js && node test/scan.test.js && node test/sim.test.js && node test/timer.test.js"
+    "test": "node check.js && node test/scan.test.js && node test/sim.test.js && node test/timer.test.js",
+    "test:e2e:pause": "node test/e2e/v7_2-pause-enter.playwright.js"
   }
 }

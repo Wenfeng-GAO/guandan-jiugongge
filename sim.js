@@ -123,7 +123,18 @@
     root.appendChild(panel);
   }
 
+  function sessionPaused() {
+    var s = window.GuandanSession;
+    return !!(s && typeof s.isPaused === 'function' && s.isPaused());
+  }
+
   function startFlashTimer() {
+    if (state.timerId) {
+      clearInterval(state.timerId);
+      state.timerId = null;
+    }
+    // v7.2：整场已暂停（暂停后回首页再进关 / 切后台）→ 不起表，等 ▶ 继续再完整闪 8 秒
+    if (sessionPaused()) return;
     state.deadline = Date.now() + FLASH_MS;
     state.timerId = setInterval(function () {
       var remain = state.deadline - Date.now();
@@ -186,6 +197,12 @@
 
   function armFlipTimeout() {
     if (state.phase !== 'flip') return;
+    if (state.flipTimeout) {
+      clearTimeout(state.flipTimeout);
+      state.flipTimeout = null;
+    }
+    if (sessionPaused()) return; // v7.2：暂停中不排下一张，▶ 继续时 onSessionResume 再排
+
     state.flipTimeout = setTimeout(function () {
       state.flipTimeout = null;
       if (state.flipIndex >= state.round.n) {
