@@ -36,7 +36,7 @@ python3 -m http.server 8000
 2. **自动翻牌**：其余 81 张由游戏按随机顺序逐张亮出（「上家出」大牌，级牌描金框），每张 1.5 秒；只显示这一张的细进度条，不显示张数和总进度，没有「下一张」「结束」按钮。
 3. **随机停牌**：翻过 N 张（N 随机 10–30）时喊停，闭卷作答 级 / 大王 / 小王 的外剩（外剩 = 总张 − 手牌 − 翻过的）。
 4. **三段反馈**：标题「翻了 N 张 · K 格错 ✕ / 全对 ✓」；三段「开局外剩 → 翻牌减 → 最终」，每格 ✓/✕ 原位显示并给正确值。可「下一盘」或「回看翻过的牌」。
-5. **升档**：连对 3 盘 → N 从 10–30 放大到 20–50（答错连对清零，升档保持）。只存在内存，刷新即重置。
+5. **升档**：连对 3 盘 → N 从 10–30 放大到 20–50。满档后顶栏只显示「已满档 20–50」。错一盘不降档，再错一盘才退回 10–30。只存在内存，刷新即重置。
 
 ## 作答九宫格（三关通用）
 
@@ -47,8 +47,9 @@ python3 -m http.server 8000
 ## 测试
 
 ```bash
-npm test   # node check.js && node test/scan.test.js && node test/sim.test.js
+npm test   # node check.js && node test/scan.test.js && node test/sim.test.js && node test/timer.test.js
 npm run test:e2e:pause   # v7.2 回归：暂停后回首页再进关不偷跑（需本机 playwright；PW=模块路径可覆盖）
+npm run test:e2e:ladder  # G-2：实战模拟升档 → 连对 → 错一盘 → 再错退档（假时钟 + 真实点击）
 ```
 
 ## 文件结构
@@ -63,6 +64,7 @@ npm run test:e2e:pause   # v7.2 回归：暂停后回首页再进关不偷跑（
 - `check.js` — Node 自检：`node check.js`
 - `test/scan.test.js` / `test/sim.test.js` — 开局扫牌 / 实战模拟逻辑测试
 - `test/e2e/v7_2-pause-enter.playwright.js` — 暂停/切后台后进关的盖屏不偷跑回归（Playwright 假时钟）
+- `test/e2e/g2-sim-ladder.playwright.js` — 实战模拟满档 / 错一盘 / 两错退档，以及出牌闭卷满档不再出现 n>3
 
 ## 如何部署
 

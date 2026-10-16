@@ -10,6 +10,7 @@
   --mute: #8b93a1;
   --lock: #5c6570;
   --amber: #d4a017;
+  --warning: var(--amber);
   --ok: #1f9d55;
   --bad: #d64545;
   --radius: 8px;
@@ -117,6 +118,20 @@ body {
   font-weight: 600;
   color: var(--amber);
 }
+/* 满档标签：出牌闭卷与实战模拟共用。颜色/字号/字重沿用 .streak-info，形状是勾选圆。 */
+.streak-info.tier-cap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.mark {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  display: block;
+}
+.tier-cap-mark { width: 11px; height: 11px; }
 
 /* 本盘统计 */
 .stats {
@@ -615,7 +630,25 @@ body {
 }
 .sim-bd-line { font-size: 12px; line-height: 16px; color: var(--mute); }
 .sim-bd-line:last-child { color: var(--text); font-weight: 600; }
-.sim-streak-note { font-size: 11px; line-height: 14px; color: var(--amber); margin-top: 4px; }
+.sim-streak-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--amber);
+  margin-top: 4px;
+}
+/* 退档：琥珀（--warning = --amber）+ 向下箭头，无底、无渐变 */
+.sim-demote-note { color: var(--warning); }
+/* 错一盘小字：字色/字号/字重用 .stat-label（--mute）。无底、不用红。放在反馈最底。 */
+.sim-hold-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  background: transparent;
+}
 .sim-review {
   display: flex;
   flex-wrap: wrap;

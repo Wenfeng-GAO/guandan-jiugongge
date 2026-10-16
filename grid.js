@@ -258,5 +258,86 @@
     return api;
   }
 
-  window.GuandanGrid = { createAnswerGrid: createAnswerGrid, CANON: CANON };
+  function svgEl(tag) {
+    return document.createElementNS('http://www.w3.org/2000/svg', tag);
+  }
+
+  function stroke(el) {
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke', 'currentColor');
+    el.setAttribute('stroke-width', '1.5');
+    el.setAttribute('stroke-linecap', 'round');
+    el.setAttribute('stroke-linejoin', 'round');
+    return el;
+  }
+
+  // 形状与颜色分开：图标用 currentColor，颜色由调用处的 token 决定。
+  function markIcon(kind) {
+    var svg = svgEl('svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.classList.add('mark');
+    if (kind === 'cap') {
+      svg.classList.add('tier-cap-mark');
+      var ring = stroke(svgEl('circle'));
+      ring.setAttribute('cx', '8');
+      ring.setAttribute('cy', '8');
+      ring.setAttribute('r', '6.25');
+      svg.appendChild(ring);
+      var tick = stroke(svgEl('path'));
+      tick.setAttribute('d', 'M5.1 8.15 6.9 9.95 11.05 5.8');
+      svg.appendChild(tick);
+      return svg;
+    }
+    if (kind === 'info') {
+      var infoRing = stroke(svgEl('circle'));
+      infoRing.setAttribute('cx', '8');
+      infoRing.setAttribute('cy', '8');
+      infoRing.setAttribute('r', '6.25');
+      svg.appendChild(infoRing);
+      var stem = stroke(svgEl('path'));
+      stem.setAttribute('d', 'M8 7.15V11.2');
+      svg.appendChild(stem);
+      var dot = svgEl('circle');
+      dot.setAttribute('cx', '8');
+      dot.setAttribute('cy', '5');
+      dot.setAttribute('r', '0.9');
+      dot.setAttribute('fill', 'currentColor');
+      svg.appendChild(dot);
+      return svg;
+    }
+    var shaft = stroke(svgEl('path'));
+    shaft.setAttribute('d', 'M8 3.25V12.25');
+    svg.appendChild(shaft);
+    var head = stroke(svgEl('path'));
+    head.setAttribute('d', 'M4.7 9.15 8 12.45 11.3 9.15');
+    svg.appendChild(head);
+    return svg;
+  }
+
+  // 出牌闭卷满档与实战模拟满档共用这一枚标签：字号/字重/琥珀来自 .streak-info，形状是勾选圆。
+  function paintStreakLabel(el, text, full) {
+    if (!el) return;
+    el.setAttribute('data-testid', full ? 'tier-cap' : 'streak-label');
+    if (!full) {
+      el.className = 'streak-info';
+      el.textContent = text;
+      return;
+    }
+    el.className = 'streak-info tier-cap';
+    el.textContent = '';
+    el.appendChild(markIcon('cap'));
+    var label = document.createElement('span');
+    label.className = 'tier-cap-text';
+    label.textContent = text;
+    el.appendChild(label);
+  }
+
+  window.GuandanGrid = {
+    createAnswerGrid: createAnswerGrid,
+    CANON: CANON,
+    markIcon: markIcon,
+    paintStreakLabel: paintStreakLabel
+  };
 })();

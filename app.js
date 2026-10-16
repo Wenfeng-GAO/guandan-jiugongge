@@ -224,8 +224,8 @@
 
   function render() {
     els['row-label'].textContent = L.rowLabel(state.roundRows);
-    els['streak-info'].textContent = '连对 ' + state.streak + '/' + L.UNLOCK_STREAK_NEED +
-      ' · 第' + state.unlockedRows + '行';
+    var bar = L.closedTopbar(state.unlockedRows, state.streak);
+    G.paintStreakLabel(els['streak-info'], bar.text, bar.full);
     renderStats();
     renderFlip();
     renderGrid();
