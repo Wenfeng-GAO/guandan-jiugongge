@@ -226,33 +226,94 @@
     return [src[0], src[1]];
   }
 
-  function simStreakState(streak, upgraded, justUpgraded) {
+  function capStreak(streak) {
+    streak = streak | 0;
+    if (streak < 0) return 0;
+    if (streak > UNLOCK_STREAK_NEED) return UNLOCK_STREAK_NEED;
+    return streak;
+  }
+
+  function simStreakState(streak, upgraded, justUpgraded, wrongStreak, justDemoted) {
     return {
-      streak: streak,
-      upgraded: upgraded,
+      streak: capStreak(streak),
+      upgraded: !!upgraded,
       nRange: simNRange(upgraded ? 1 : 0),
-      justUpgraded: justUpgraded
+      justUpgraded: !!justUpgraded,
+      wrongStreak: wrongStreak > 0 ? (wrongStreak | 0) : 0,
+      justDemoted: !!justDemoted
     };
   }
 
-  // state: {streak, upgraded}。连对满 3 升档并保持；答错只把 streak 清零。
-  // 也接受纯数字 streak（尚未升档）。
-  function applySimStreak(state, allCorrect) {
-    var streak = 0;
-    var upgraded = false;
+  function readSimStreak(state) {
     if (typeof state === 'number') {
-      streak = state | 0;
-    } else if (state && typeof state === 'object') {
-      streak = state.streak | 0;
-      upgraded = !!state.upgraded;
+      return { streak: capStreak(state), upgraded: false, justUpgraded: false, wrongStreak: 0, justDemoted: false };
     }
-    if (streak < 0) streak = 0;
-    if (!allCorrect) return simStreakState(0, upgraded, false);
-    var next = streak + 1;
-    if (!upgraded && next >= UNLOCK_STREAK_NEED) {
-      return simStreakState(next, true, true);
+    state = state || {};
+    return {
+      streak: capStreak(state.streak),
+      upgraded: !!state.upgraded,
+      justUpgraded: !!state.justUpgraded,
+      wrongStreak: state.wrongStreak > 0 ? (state.wrongStreak | 0) : 0,
+      justDemoted: !!state.justDemoted
+    };
+  }
+
+  // state: {streak, upgraded, wrongStreak}。也接受纯数字 streak（尚未升档）。
+  // 未升档：连对满 3 升到 20–50，答错只清连对。
+  // 已升档：顶栏不再计连对，连对不再往上加；错一盘保持档位并记连错 1；
+  // 连着错两盘退回 10–30。中间答对则连错清零。
+  function applySimStreak(state, allCorrect) {
+    var cur = readSimStreak(state);
+    if (!allCorrect) {
+      if (cur.upgraded) {
+        var misses = cur.wrongStreak + 1;
+        if (misses >= 2) return simStreakState(0, false, false, 0, true);
+        return simStreakState(0, true, false, misses, false);
+      }
+      return simStreakState(0, false, false, 0, false);
     }
-    return simStreakState(next, upgraded, false);
+    if (cur.upgraded) {
+      // 满档后答对只清连错，连对停在当前值（至多 3），不再出现 4/3
+      return simStreakState(cur.streak, true, false, 0, false);
+    }
+    var next = cur.streak + 1;
+    if (next >= UNLOCK_STREAK_NEED) return simStreakState(UNLOCK_STREAK_NEED, true, true, 0, false);
+    return simStreakState(next, false, false, 0, false);
+  }
+
+  // 顶栏文案。满档与出牌闭卷共用「已满档」写法，不再带连对 n/3。
+  function simTopbar(state) {
+    var cur = readSimStreak(state);
+    if (cur.upgraded) return { full: true, text: '已满档 20–50' };
+    return { full: false, text: '连对 ' + cur.streak + '/' + UNLOCK_STREAK_NEED + ' · N 10–30' };
+  }
+
+  // 反馈底部文案。升档那一盘保持原句；满档后的答对不再写连对计数。
+  function simFeedbackNotes(state) {
+    var cur = readSimStreak(state);
+    if (cur.justDemoted) {
+      return [{ role: 'demote', text: '连错 2 盘 → N 退回 10–30' }];
+    }
+    if (cur.justUpgraded) {
+      return [{ role: 'upgrade', text: '连对 3 盘 → N 从 10–30 放大到 20–50（已升档）' }];
+    }
+    if (cur.upgraded) {
+      if (cur.wrongStreak >= 1) return [{ role: 'hold', text: '再错一盘退回 10–30' }];
+      return [];
+    }
+    return [{
+      role: 'progress',
+      text: '连对 ' + cur.streak + '/' + UNLOCK_STREAK_NEED + ' → 升档后 N 从 10–30 放大到 20–50'
+    }];
+  }
+
+  function closedTopbar(unlockedRows, streak) {
+    unlockedRows = clampRows(unlockedRows);
+    if (unlockedRows >= MAX_UNLOCKED_ROWS) return { full: true, text: '已满档' };
+    return {
+      full: false,
+      text: '连对 ' + capStreak(streak) + '/' + UNLOCK_STREAK_NEED + ' · 第' + unlockedRows + '行'
+    };
   }
 
   function dealSimRound(levelRank, rng, nRange) {
@@ -384,8 +445,13 @@
     if (!allCorrect) {
       return { unlockedRows: unlockedRows, streak: 0, justUnlocked: false };
     }
+    // 已满三行：连对停在 3，不再累加成 4/3、5/3
+    if (unlockedRows >= MAX_UNLOCKED_ROWS) {
+      var held = capStreak(streak + 1);
+      return { unlockedRows: unlockedRows, streak: held, justUnlocked: false };
+    }
     var next = streak + 1;
-    if (next >= UNLOCK_STREAK_NEED && unlockedRows < MAX_UNLOCKED_ROWS) {
+    if (next >= UNLOCK_STREAK_NEED) {
       return { unlockedRows: unlockedRows + 1, streak: 0, justUnlocked: true };
     }
     return { unlockedRows: unlockedRows, streak: next, justUnlocked: false };
@@ -490,6 +556,9 @@
     dealSimRound: dealSimRound,
     simNRange: simNRange,
     applySimStreak: applySimStreak,
+    simTopbar: simTopbar,
+    simFeedbackNotes: simFeedbackNotes,
+    closedTopbar: closedTopbar,
     sortHand: sortHand,
     numberOptions: numberOptions,
     checkScan: checkScan

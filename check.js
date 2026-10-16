@@ -250,6 +250,31 @@ var sFail = L.applyStreakAfterCheck(1, 2, false);
 assert.deepStrictEqual(sFail, { unlockedRows: 1, streak: 0, justUnlocked: false });
 var sMax = L.applyStreakAfterCheck(3, 2, true);
 assert.deepStrictEqual(sMax, { unlockedRows: 3, streak: 3, justUnlocked: false });
+// 已满三行后再连对：连对停在 3，顶栏改「已满档」，不再出现 4/3
+var sCap = L.applyStreakAfterCheck(3, 3, true);
+assert.deepStrictEqual(sCap, { unlockedRows: 3, streak: 3, justUnlocked: false });
+var sOver = L.applyStreakAfterCheck(3, 8, true);
+assert.deepStrictEqual(sOver, { unlockedRows: 3, streak: 3, justUnlocked: false });
+assert.deepStrictEqual(L.closedTopbar(3, 4), { full: true, text: '已满档' });
+assert.deepStrictEqual(L.closedTopbar(3, 0), { full: true, text: '已满档' });
+assert.deepStrictEqual(L.closedTopbar(2, 1), { full: false, text: '连对 1/3 · 第2行' });
+assert.deepStrictEqual(L.closedTopbar(1, 0), { full: false, text: '连对 0/3 · 第1行' });
+
+// 从第 1 行连对很多盘：解锁过程与满档顶栏都不产生 n>3 的「n/3」
+var rows = 1;
+var streak = 0;
+for (var i = 0; i < 12; i++) {
+  var step = L.applyStreakAfterCheck(rows, streak, true);
+  rows = step.unlockedRows;
+  streak = step.streak;
+  var label = L.closedTopbar(rows, streak).text;
+  var frac = label.match(/(\d+)\/3/);
+  assert.ok(!frac || (frac[1] | 0) <= 3, '闭卷顶栏越界: ' + label);
+  if (rows >= 3) assert.strictEqual(label, '已满档');
+  assert.ok(streak <= 3, '闭卷连对越界 ' + streak);
+}
+assert.strictEqual(rows, 3);
+assert.strictEqual(L.closedTopbar(rows, streak).text, '已满档');
 
 assert.strictEqual(L.UNLOCK_STREAK_NEED, 3);
 assert.ok(L.rowLabel(1).indexOf('级牌') !== -1);

@@ -173,12 +173,34 @@ as2.flips.forEach(function (c) {
   if (c.suit === '♥' && c.rank === '2') assert.strictEqual(L.isWild(c, '5'), false);
 });
 
-// —— 连对 3 盘升档到 [20,50]；答错 streak 归零，升档保持 ——
+function fields(streak, upgraded, justUpgraded, wrongStreak, justDemoted) {
+  return {
+    streak: streak,
+    upgraded: upgraded,
+    nRange: upgraded ? [20, 50] : [10, 30],
+    justUpgraded: justUpgraded,
+    wrongStreak: wrongStreak,
+    justDemoted: justDemoted
+  };
+}
+function joinedChrome(st) {
+  var notes = L.simFeedbackNotes(st).map(function (n) { return n.text; }).join('\n');
+  return L.simTopbar(st).text + '\n' + notes;
+}
+function overflowFractions(text) {
+  var found = [];
+  var re = /(\d+)\/3/g;
+  var m;
+  while ((m = re.exec(text))) {
+    if ((m[1] | 0) > 3) found.push(m[0]);
+  }
+  return found;
+}
+
+// —— 连对 3 盘升档到 [20,50]；未升档答错只清连对 ——
 var state = { streak: 0, upgraded: false };
 state = L.applySimStreak(state, true);
-assert.deepStrictEqual(state, {
-  streak: 1, upgraded: false, nRange: [10, 30], justUpgraded: false
-});
+assert.deepStrictEqual(state, fields(1, false, false, 0, false));
 state = L.applySimStreak(state, true);
 assert.strictEqual(state.streak, 2);
 assert.strictEqual(state.upgraded, false);
@@ -186,43 +208,72 @@ assert.deepStrictEqual(state.nRange, [10, 30]);
 assert.strictEqual(state.justUpgraded, false);
 
 var broken = L.applySimStreak(state, false);
-assert.deepStrictEqual(broken, {
-  streak: 0, upgraded: false, nRange: [10, 30], justUpgraded: false
-});
+assert.deepStrictEqual(broken, fields(0, false, false, 0, false));
 
 state = { streak: 0, upgraded: false };
 state = L.applySimStreak(state, true);
 state = L.applySimStreak(state, true);
 state = L.applySimStreak(state, true);
-assert.deepStrictEqual(state, {
-  streak: 3, upgraded: true, nRange: [20, 50], justUpgraded: true
-});
+assert.deepStrictEqual(state, fields(3, true, true, 0, false));
 assert.deepStrictEqual(state.nRange, L.SIM_N_UP);
 assert.deepStrictEqual(L.simNRange(state), [20, 50]);
+assert.deepStrictEqual(L.simTopbar(state), { full: true, text: '已满档 20–50' });
+assert.deepStrictEqual(L.simFeedbackNotes(state), [
+  { role: 'upgrade', text: '连对 3 盘 → N 从 10–30 放大到 20–50（已升档）' }
+]);
 
-var kept = L.applySimStreak(state, false);
-assert.deepStrictEqual(kept, {
-  streak: 0, upgraded: true, nRange: [20, 50], justUpgraded: false
-});
-var still = L.applySimStreak(kept, true);
-assert.deepStrictEqual(still, {
-  streak: 1, upgraded: true, nRange: [20, 50], justUpgraded: false
-});
-still = L.applySimStreak(still, true);
-still = L.applySimStreak(still, true);
-assert.strictEqual(still.streak, 3);
-assert.strictEqual(still.upgraded, true);
-assert.strictEqual(still.justUpgraded, false);
-assert.deepStrictEqual(still.nRange, [20, 50]);
+// 升档后再连对 1–3 盘：任何文案都不出现 n>3 的「n/3」，顶栏只有满档
+var afterUp = state;
+for (var extra = 1; extra <= 3; extra++) {
+  afterUp = L.applySimStreak(afterUp, true);
+  assert.strictEqual(afterUp.upgraded, true, '升档后连对仍满档');
+  assert.ok(afterUp.streak <= 3, '连对停在 3 以内，实际 ' + afterUp.streak);
+  assert.strictEqual(afterUp.justUpgraded, false);
+  assert.deepStrictEqual(afterUp.nRange, [20, 50]);
+  assert.deepStrictEqual(L.simFeedbackNotes(afterUp), []);
+  var chrome = joinedChrome(afterUp);
+  assert.deepStrictEqual(overflowFractions(chrome), [], '升档后连对 ' + extra + ' 盘出现越界: ' + chrome);
+  assert.strictEqual(L.simTopbar(afterUp).text, '已满档 20–50');
+  assert.ok(chrome.indexOf('连对') === -1, chrome);
+}
+
+// 升档后错一盘：不退档，顶栏不变，反馈只有那行小字
+var oneMiss = L.applySimStreak(state, false);
+assert.deepStrictEqual(oneMiss, fields(0, true, false, 1, false));
+assert.deepStrictEqual(L.simTopbar(oneMiss), { full: true, text: '已满档 20–50' });
+assert.deepStrictEqual(L.simFeedbackNotes(oneMiss), [
+  { role: 'hold', text: '再错一盘退回 10–30' }
+]);
+assert.deepStrictEqual(overflowFractions(joinedChrome(oneMiss)), []);
+
+// 错一盘后再答对：连错清零，仍满档
+var cleared = L.applySimStreak(oneMiss, true);
+assert.deepStrictEqual(cleared, fields(0, true, false, 0, false));
+assert.deepStrictEqual(L.simFeedbackNotes(cleared), []);
+assert.deepStrictEqual(L.simTopbar(cleared).text, '已满档 20–50');
+// 清零后再错一盘，仍只是「再错一盘」，不退档
+var missAgain = L.applySimStreak(cleared, false);
+assert.deepStrictEqual(missAgain, fields(0, true, false, 1, false));
+assert.strictEqual(missAgain.justDemoted, false);
+
+// 连着错两盘：退回 10–30，顶栏连对 0/3，反馈写退档
+var demoted = L.applySimStreak(oneMiss, false);
+assert.deepStrictEqual(demoted, fields(0, false, false, 0, true));
+assert.deepStrictEqual(demoted.nRange, [10, 30]);
+assert.deepStrictEqual(L.simTopbar(demoted), { full: false, text: '连对 0/3 · N 10–30' });
+assert.deepStrictEqual(L.simFeedbackNotes(demoted), [
+  { role: 'demote', text: '连错 2 盘 → N 退回 10–30' }
+]);
+assert.deepStrictEqual(overflowFractions(joinedChrome(demoted)), []);
 
 // 纯数字 streak：连对已有 2，再对一盘即升档
 var fromNumber = L.applySimStreak(2, true);
-assert.deepStrictEqual(fromNumber, {
-  streak: 3, upgraded: true, nRange: [20, 50], justUpgraded: true
-});
+assert.deepStrictEqual(fromNumber, fields(3, true, true, 0, false));
 
-// 升档后的区间用于发牌
-var upgradedRound = L.dealSimRound('K', lcg(99), kept.nRange);
+// 升档后的区间用于发牌；退档后回到 10–30
+var upgradedRound = L.dealSimRound('K', lcg(99), oneMiss.nRange);
 assertRound(upgradedRound, 'K', 20, 50);
+var demotedRound = L.dealSimRound('K', lcg(99), demoted.nRange);
+assertRound(demotedRound, 'K', 10, 30);
 
 console.log('OK：sim.test.js 全部通过');

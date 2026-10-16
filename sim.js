@@ -314,17 +314,8 @@
     state.grid.setGuesses(state.gridGuesses);
     state.grid.showFeedback({ level: fo.level, big: fo.big, small: fo.small });
 
-    // 升档线：刚升档 / 已升档保持 / 连对进度
-    var st = state.streakState;
-    var upNote = div('sim-streak-note');
-    if (st.justUpgraded) {
-      upNote.textContent = '连对 3 盘 → N 从 10–30 放大到 20–50（已升档）';
-    } else if (st.upgraded) {
-      upNote.textContent = '已升档：N 从 10–30 放大到 20–50 · 连对 ' + st.streak + '/3';
-    } else {
-      upNote.textContent = '连对 ' + st.streak + '/3 → 升档后 N 从 10–30 放大到 20–50';
-    }
-    panel.appendChild(upNote);
+    // 升档那一盘的原句 / 未升档进度 / 退档。错一盘的小字放到面板最底。
+    appendFeedbackNotes(panel, false);
 
     if (state.reviewing) panel.appendChild(renderReviewList());
 
@@ -359,8 +350,37 @@
     });
     actions.appendChild(review);
     panel.appendChild(actions);
+    appendFeedbackNotes(panel, true);
 
     root.appendChild(panel);
+  }
+
+  function appendFeedbackNotes(panel, holdOnly) {
+    L.simFeedbackNotes(state.streakState).forEach(function (note) {
+      var isHold = note.role === 'hold';
+      if (isHold !== holdOnly) return;
+      panel.appendChild(renderFeedbackNote(note));
+    });
+  }
+
+  function renderFeedbackNote(note) {
+    if (note.role === 'hold') {
+      var hold = div('stat-label sim-hold-note');
+      hold.setAttribute('data-testid', 'sim-hold-note');
+      hold.appendChild(G.markIcon('info'));
+      hold.appendChild(document.createTextNode(note.text));
+      return hold;
+    }
+    if (note.role === 'demote') {
+      var demote = div('sim-streak-note sim-demote-note');
+      demote.setAttribute('data-testid', 'sim-demote-note');
+      demote.appendChild(G.markIcon('down'));
+      demote.appendChild(document.createTextNode(note.text));
+      return demote;
+    }
+    var line = div('sim-streak-note', note.text);
+    line.setAttribute('data-testid', 'sim-streak-note');
+    return line;
   }
 
   function renderReviewList() {
@@ -380,9 +400,8 @@
     var root = els.root;
     var streakInfo = document.getElementById('sim-streak-info');
     if (streakInfo) {
-      streakInfo.textContent = state.streakState.upgraded
-        ? '已升档 20–50 · 连对 ' + state.streakState.streak + '/3'
-        : '连对 ' + state.streakState.streak + '/3 · N 10–30';
+      var bar = L.simTopbar(state.streakState);
+      G.paintStreakLabel(streakInfo, bar.text, bar.full);
     }
     if (!root) return;
     destroyGrid();
